@@ -50,9 +50,9 @@ public enum StateFile {
         let data = try encoder.encode(snapshot)
 
         let tmpURL = Paths.stateFile.appendingPathExtension("tmp.\(ProcessInfo.processInfo.processIdentifier)")
-        try data.write(to: tmpURL, options: .atomic)
-        // `replaceItemAt` does the rename; if the destination doesn't exist
-        // it creates it.
+        try data.write(to: tmpURL)
+        // `replaceItemAt` does the atomic rename; if the destination doesn't
+        // exist it creates it.
         _ = try FileManager.default.replaceItemAt(Paths.stateFile, withItemAt: tmpURL)
     }
 

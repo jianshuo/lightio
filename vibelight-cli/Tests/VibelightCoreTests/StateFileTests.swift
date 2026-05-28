@@ -45,14 +45,13 @@ final class StateFileTests: XCTestCase {
         XCTAssertTrue(snapshot.sessions.isEmpty)
     }
 
-    func testWriteIsAtomic() throws {
-        // Write a valid snapshot, then verify no leftover .tmp files
+    func testWriteLeavesNoTmpFiles() throws {
         let snapshot = StateSnapshot(sessions: [
             "x": StateSnapshot.SessionEntry(state: .working, ts: 1, cwd: nil)
         ])
         try StateFile.write(snapshot)
         let entries = try FileManager.default.contentsOfDirectory(atPath: Paths.stateDir.path)
-        XCTAssertEqual(entries.filter { $0.hasSuffix(".tmp") }, [])
+        XCTAssertEqual(entries.filter { $0.contains(".tmp") }, [])
     }
 
     func testUpdateAtomicallyMergesSessions() throws {
