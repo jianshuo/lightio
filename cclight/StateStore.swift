@@ -30,6 +30,10 @@ final class StateStore: ObservableObject {
     private var stream: FSEventStreamRef?
     private var idleTimer: DispatchSourceTimer?
     private let idleTimeout: TimeInterval
+    /// First reload after `start()` shouldn't chime — otherwise launching
+    /// the app while a session is already waiting would ding immediately,
+    /// which is jarring. Cleared after the first reload completes.
+    private var firstLoad = true
 
     init(idleTimeout: TimeInterval = 5 * 60) {
         self.idleTimeout = idleTimeout
@@ -117,6 +121,7 @@ final class StateStore: ObservableObject {
         idleTimer?.cancel()
         idleTimer = nil
 
+        let previousState = currentState
         switch merged {
         case .working:
             currentState = .working
@@ -131,6 +136,13 @@ final class StateStore: ObservableObject {
         case .idle:
             currentState = .idle
         }
+
+        // Per-state chime on transitions. Skip the very first reload so
+        // launching the app into an already-waiting session doesn't ding.
+        if !firstLoad {
+            SoundPlayer.play(transition: currentState, from: previousState)
+        }
+        firstLoad = false
     }
 
     /// `kill(pid, 0)` doesn't send a signal — it just runs the permission

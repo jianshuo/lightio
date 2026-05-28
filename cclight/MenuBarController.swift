@@ -19,6 +19,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var onUninstallHooks: (() -> Void)?
     var onToggleLaunchAtLogin: (() -> Void)?
     var isLaunchAtLoginOn: () -> Bool = { false }
+    var onTogglePlaySounds: (() -> Void)?
+    var isPlaySoundsOn: () -> Bool = { false }
 
     init(store: StateStore) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -123,6 +125,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         launchItem.state = isLaunchAtLoginOn() ? .on : .off
         menu.addItem(launchItem)
 
+        let soundsItem = NSMenuItem(
+            title: "Play Sounds",
+            action: #selector(togglePlaySounds),
+            keyEquivalent: ""
+        )
+        soundsItem.target = self
+        soundsItem.state = isPlaySoundsOn() ? .on : .off
+        menu.addItem(soundsItem)
+
         let about = NSMenuItem(title: "About CCLight", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -178,6 +189,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func installHooks() { onInstallHooks?() }
     @objc private func uninstallHooks() { onUninstallHooks?() }
     @objc private func toggleLaunchAtLogin() { onToggleLaunchAtLogin?() }
+    @objc private func togglePlaySounds() { onTogglePlaySounds?() }
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(nil)

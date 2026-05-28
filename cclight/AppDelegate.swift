@@ -37,6 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.onToggleLaunchAtLogin = {
             FirstRun.setLaunchAtLogin(!FirstRun.isLaunchAtLoginEnabled)
         }
+        menuBar.isPlaySoundsOn = { SoundPlayer.enabled }
+        menuBar.onTogglePlaySounds = {
+            SoundPlayer.enabled = !SoundPlayer.enabled
+        }
 
         DispatchQueue.main.async { [weak self] in self?.runFirstRunIfNeeded() }
 
