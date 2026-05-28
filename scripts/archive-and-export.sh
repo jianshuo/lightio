@@ -1,6 +1,6 @@
 #!/bin/bash
 # Archive CCLight for App Store distribution.
-# Prereq: an app record for bundle id com.wangjianshuo.cclight must exist
+# Prereq: an app record for bundle id com.wangjianshuo.lightio must exist
 # in App Store Connect (https://appstoreconnect.apple.com/apps) and the team's
 # Apple Distribution cert + provisioning profile must be available.
 #

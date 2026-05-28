@@ -15,7 +15,7 @@ public enum Paths {
         return home
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Containers", isDirectory: true)
-            .appendingPathComponent("com.wangjianshuo.cclight", isDirectory: true)
+            .appendingPathComponent("com.wangjianshuo.lightio", isDirectory: true)
             .appendingPathComponent("Data", isDirectory: true)
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Application Support", isDirectory: true)
