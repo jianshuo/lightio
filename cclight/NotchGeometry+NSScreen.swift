@@ -1,5 +1,5 @@
 import AppKit
-import LightioCore
+import CCLightCore
 
 extension NotchGeometry {
     /// Best-effort: read the notch dimensions from `NSScreen.safeAreaInsets`

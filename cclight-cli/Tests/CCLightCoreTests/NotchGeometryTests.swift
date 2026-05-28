@@ -1,5 +1,5 @@
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 import CoreGraphics
 
 final class NotchGeometryTests: XCTestCase {

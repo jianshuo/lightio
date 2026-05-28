@@ -1,7 +1,7 @@
 import Foundation
 
-/// Resolves the paths lightio reads/writes. Honors `VIBELIGHT_STATE_DIR`
-/// for tests so we never touch the user's real `~/.lightio`.
+/// Resolves the paths cclight reads/writes. Honors `VIBELIGHT_STATE_DIR`
+/// for tests so we never touch the user's real `~/.cclight`.
 public enum Paths {
     public static var stateDir: URL {
         if let override = ProcessInfo.processInfo.environment["VIBELIGHT_STATE_DIR"] {
@@ -15,7 +15,7 @@ public enum Paths {
         return home
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Containers", isDirectory: true)
-            .appendingPathComponent("com.wangjianshuo.lightio", isDirectory: true)
+            .appendingPathComponent("com.wangjianshuo.cclight", isDirectory: true)
             .appendingPathComponent("Data", isDirectory: true)
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Application Support", isDirectory: true)

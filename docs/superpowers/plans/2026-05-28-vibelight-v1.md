@@ -1,24 +1,24 @@
-# Lightio V1 Implementation Plan
+# CCLight V1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship V1 of lightio — a macOS menu-bar app that turns the MacBook notch into an ambient Claude Code status indicator, plus a `lightio` CLI that Claude Code hooks call to drive the state.
+**Goal:** Ship V1 of cclight — a macOS menu-bar app that turns the MacBook notch into an ambient Claude Code status indicator, plus a `cclight` CLI that Claude Code hooks call to drive the state.
 
-**Architecture:** Two artifacts in one repo. A SwiftPM package `lightio-cli/` produces both a shared `LightioCore` library (state file I/O, hook payload parsing, hook installer) and the `lightio` CLI binary. The existing `lightio.xcodeproj` Xcode app target depends on `LightioCore` as a local SwiftPM package, embeds the CLI binary in its `Contents/Resources/`, runs as a menu-bar agent (LSUIElement), watches `~/.lightio/state.json` via FSEvents, and renders a transparent borderless `NSWindow` under the notch.
+**Architecture:** Two artifacts in one repo. A SwiftPM package `cclight-cli/` produces both a shared `CCLightCore` library (state file I/O, hook payload parsing, hook installer) and the `cclight` CLI binary. The existing `cclight.xcodeproj` Xcode app target depends on `CCLightCore` as a local SwiftPM package, embeds the CLI binary in its `Contents/Resources/`, runs as a menu-bar agent (LSUIElement), watches `~/.cclight/state.json` via FSEvents, and renders a transparent borderless `NSWindow` under the notch.
 
 **Tech Stack:** Swift 5.9+, SwiftUI scaffold + AppKit (NSWindow, NSStatusItem, CALayer, CoreServices/FSEvents), Foundation, XCTest, SwiftPM. Target macOS 14 (Sonoma).
 
-**Spec:** [docs/superpowers/specs/2026-05-28-lightio-design.md](../specs/2026-05-28-lightio-design.md)
+**Spec:** [docs/superpowers/specs/2026-05-28-cclight-design.md](../specs/2026-05-28-cclight-design.md)
 
 ---
 
 ## File Structure
 
 ```
-lightio/
-├── lightio.xcodeproj/           (existing, will reference local package)
-├── lightio/                     (app target sources, auto-synced)
-│   ├── lightioApp.swift         (modify — switch to AppDelegate adaptor)
+cclight/
+├── cclight.xcodeproj/           (existing, will reference local package)
+├── cclight/                     (app target sources, auto-synced)
+│   ├── cclightApp.swift         (modify — switch to AppDelegate adaptor)
 │   ├── ContentView.swift          (delete — no main window)
 │   ├── AppDelegate.swift          (new — owns top-level controllers)
 │   ├── StateStore.swift           (new — FSEvents + merge + idle timer)
@@ -27,19 +27,19 @@ lightio/
 │   ├── NotchOverlayView.swift     (new — CALayer rendering)
 │   ├── MenuBarController.swift    (new — NSStatusItem + menu)
 │   └── FirstRun.swift             (new — symlink + hooks + login-item dialogs)
-├── lightio-cli/                 (new SwiftPM package)
+├── cclight-cli/                 (new SwiftPM package)
 │   ├── Package.swift
 │   ├── Sources/
-│   │   ├── LightioCore/
+│   │   ├── CCLightCore/
 │   │   │   ├── SessionState.swift
 │   │   │   ├── StateFile.swift
 │   │   │   ├── HookInputJSON.swift
 │   │   │   ├── HookInstaller.swift
 │   │   │   └── Paths.swift
-│   │   └── lightio/             (CLI executable)
+│   │   └── cclight/             (CLI executable)
 │   │       └── main.swift
 │   └── Tests/
-│       └── LightioCoreTests/
+│       └── CCLightCoreTests/
 │           ├── StateFileTests.swift
 │           ├── HookInputJSONTests.swift
 │           ├── HookInstallerTests.swift
@@ -47,49 +47,49 @@ lightio/
 └── docs/superpowers/{specs,plans}/...
 ```
 
-**Why split this way:** The CLI must be invokable independently (Claude Code hooks call it from any cwd), so it lives in SwiftPM where it builds and tests as a standalone command. The app depends on the same `LightioCore` library for shared types (`SessionState`, file IO) so the two halves of the system can never drift out of sync.
+**Why split this way:** The CLI must be invokable independently (Claude Code hooks call it from any cwd), so it lives in SwiftPM where it builds and tests as a standalone command. The app depends on the same `CCLightCore` library for shared types (`SessionState`, file IO) so the two halves of the system can never drift out of sync.
 
 ---
 
 ## Task 1: Project setup — SwiftPM package, Xcode dependency, build phase
 
 **Files:**
-- Create: `lightio-cli/Package.swift`
-- Create: `lightio-cli/Sources/LightioCore/.gitkeep`
-- Create: `lightio-cli/Sources/lightio/main.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/SmokeTest.swift`
+- Create: `cclight-cli/Package.swift`
+- Create: `cclight-cli/Sources/CCLightCore/.gitkeep`
+- Create: `cclight-cli/Sources/cclight/main.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/SmokeTest.swift`
 - Modify: `.gitignore`
 - Manual Xcode work: add local package dep, add Run Script build phase
 
 - [ ] **Step 1: Create the SwiftPM manifest**
 
-Create `lightio-cli/Package.swift`:
+Create `cclight-cli/Package.swift`:
 
 ```swift
 // swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
-    name: "lightio-cli",
+    name: "cclight-cli",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "LightioCore", targets: ["LightioCore"]),
-        .executable(name: "lightio", targets: ["lightio"]),
+        .library(name: "CCLightCore", targets: ["CCLightCore"]),
+        .executable(name: "cclight", targets: ["cclight"]),
     ],
     targets: [
         .target(
-            name: "LightioCore",
-            path: "Sources/LightioCore"
+            name: "CCLightCore",
+            path: "Sources/CCLightCore"
         ),
         .executableTarget(
-            name: "lightio",
-            dependencies: ["LightioCore"],
-            path: "Sources/lightio"
+            name: "cclight",
+            dependencies: ["CCLightCore"],
+            path: "Sources/cclight"
         ),
         .testTarget(
-            name: "LightioCoreTests",
-            dependencies: ["LightioCore"],
-            path: "Tests/LightioCoreTests"
+            name: "CCLightCoreTests",
+            dependencies: ["CCLightCore"],
+            path: "Tests/CCLightCoreTests"
         ),
     ]
 )
@@ -97,24 +97,24 @@ let package = Package(
 
 - [ ] **Step 2: Create placeholder CLI entry**
 
-Create `lightio-cli/Sources/lightio/main.swift`:
+Create `cclight-cli/Sources/cclight/main.swift`:
 
 ```swift
 import Foundation
 
-print("lightio (stub)")
+print("cclight (stub)")
 exit(0)
 ```
 
-Create `lightio-cli/Sources/LightioCore/.gitkeep` (empty file — SwiftPM needs the directory to exist).
+Create `cclight-cli/Sources/CCLightCore/.gitkeep` (empty file — SwiftPM needs the directory to exist).
 
 - [ ] **Step 3: Create a smoke test so the test target compiles**
 
-Create `lightio-cli/Tests/LightioCoreTests/SmokeTest.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/SmokeTest.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class SmokeTest: XCTestCase {
     func testCanImportModule() {
@@ -127,35 +127,35 @@ final class SmokeTest: XCTestCase {
 
 Run:
 ```bash
-cd /Users/jianshuo/code/lightio/lightio-cli
+cd /Users/jianshuo/code/cclight/cclight-cli
 swift build
 swift test
 ```
 
 Expected:
-- `swift build` succeeds and produces `.build/debug/lightio`.
+- `swift build` succeeds and produces `.build/debug/cclight`.
 - `swift test` reports `1 test passed`.
 
 - [ ] **Step 5: Extend .gitignore for SwiftPM and Xcode build artifacts**
 
-Edit `/Users/jianshuo/code/lightio/.gitignore`. After existing contents, append:
+Edit `/Users/jianshuo/code/cclight/.gitignore`. After existing contents, append:
 
 ```
 # SwiftPM
-lightio-cli/.build/
-lightio-cli/.swiftpm/
-lightio-cli/Package.resolved
+cclight-cli/.build/
+cclight-cli/.swiftpm/
+cclight-cli/Package.resolved
 ```
 
 - [ ] **Step 6: Add the local SwiftPM package as an Xcode dependency**
 
-This is Xcode UI work, no code to write. Open `lightio.xcodeproj` in Xcode, then:
+This is Xcode UI work, no code to write. Open `cclight.xcodeproj` in Xcode, then:
 
-1. Select the project root in the navigator → `lightio` project (not the target) → "Package Dependencies" tab → click `+`.
+1. Select the project root in the navigator → `cclight` project (not the target) → "Package Dependencies" tab → click `+`.
 2. In the dialog click "Add Local..." (bottom-left button).
-3. Choose the folder `lightio-cli` and click "Add Package".
-4. In the next dialog, ensure the `LightioCore` library is added to the `lightio` app target. Click "Add Package".
-5. Build the app target (⌘B). It should still build the SwiftUI scaffold but now linked against `LightioCore`.
+3. Choose the folder `cclight-cli` and click "Add Package".
+4. In the next dialog, ensure the `CCLightCore` library is added to the `cclight` app target. Click "Add Package".
+5. Build the app target (⌘B). It should still build the SwiftUI scaffold but now linked against `CCLightCore`.
 
 If Xcode complains about Package.resolved, that file is auto-generated and was intentionally gitignored in Step 5.
 
@@ -163,34 +163,34 @@ If Xcode complains about Package.resolved, that file is auto-generated and was i
 
 Still in Xcode:
 
-1. Select `lightio` target → "Build Phases" tab.
+1. Select `cclight` target → "Build Phases" tab.
 2. Click `+` (top-left of the Build Phases pane) → "New Run Script Phase".
-3. Rename the new phase to "Embed lightio CLI" (double-click the title).
+3. Rename the new phase to "Embed cclight CLI" (double-click the title).
 4. Drag the phase to be **after** "Copy Bundle Resources" but before any "Sign" phase.
 5. Uncheck "Based on dependency analysis" (we want this to always run).
 6. Paste this script into the body:
 
 ```bash
 set -euo pipefail
-CLI_DIR="$SRCROOT/lightio-cli"
+CLI_DIR="$SRCROOT/cclight-cli"
 
 cd "$CLI_DIR"
 swift build -c release --arch arm64 --disable-sandbox
 
 DEST="$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources"
 mkdir -p "$DEST"
-cp ".build/arm64-apple-macosx/release/lightio" "$DEST/lightio"
-chmod +x "$DEST/lightio"
-echo "Embedded lightio CLI → $DEST/lightio"
+cp ".build/arm64-apple-macosx/release/cclight" "$DEST/cclight"
+chmod +x "$DEST/cclight"
+echo "Embedded cclight CLI → $DEST/cclight"
 ```
 
 - [ ] **Step 8: Build the app to verify the CLI gets embedded**
 
-In Xcode, ⌘B to build the app target. The build log should show "Embedded lightio CLI → …".
+In Xcode, ⌘B to build the app target. The build log should show "Embedded cclight CLI → …".
 
 Then inspect:
 ```bash
-ls -l ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app/Contents/Resources/lightio
+ls -l ~/Library/Developer/Xcode/DerivedData/cclight-*/Build/Products/Debug/cclight.app/Contents/Resources/cclight
 ```
 
 Expected: the file exists and is executable (~3 MB Swift binary).
@@ -198,29 +198,29 @@ Expected: the file exists and is executable (~3 MB Swift binary).
 - [ ] **Step 9: Commit**
 
 ```bash
-cd /Users/jianshuo/code/lightio
-git add lightio-cli .gitignore lightio.xcodeproj
+cd /Users/jianshuo/code/cclight
+git add cclight-cli .gitignore cclight.xcodeproj
 git commit -m "Scaffold SwiftPM CLI package and embed-on-build phase"
 ```
 
-Note: `lightio.xcodeproj` changed because Xcode wrote package-reference and build-phase entries into `project.pbxproj`. That's expected.
+Note: `cclight.xcodeproj` changed because Xcode wrote package-reference and build-phase entries into `project.pbxproj`. That's expected.
 
 ---
 
 ## Task 2: SessionState model + Paths helper
 
 **Files:**
-- Create: `lightio-cli/Sources/LightioCore/SessionState.swift`
-- Create: `lightio-cli/Sources/LightioCore/Paths.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift`
+- Create: `cclight-cli/Sources/CCLightCore/SessionState.swift`
+- Create: `cclight-cli/Sources/CCLightCore/Paths.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift`
 
 - [ ] **Step 1: Write the failing test for SessionState codable round-trip and merge**
 
-Create `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class SessionStateTests: XCTestCase {
     func testRawValuesAreStable() {
@@ -250,7 +250,7 @@ final class SessionStateTests: XCTestCase {
 - [ ] **Step 2: Run the test to confirm it fails to compile**
 
 ```bash
-cd /Users/jianshuo/code/lightio/lightio-cli
+cd /Users/jianshuo/code/cclight/cclight-cli
 swift test --filter SessionStateTests
 ```
 
@@ -258,7 +258,7 @@ Expected: build error — `SessionState`, `MergedState` not defined.
 
 - [ ] **Step 3: Implement SessionState and MergedState**
 
-Create `lightio-cli/Sources/LightioCore/SessionState.swift`:
+Create `cclight-cli/Sources/CCLightCore/SessionState.swift`:
 
 ```swift
 import Foundation
@@ -305,20 +305,20 @@ Expected: all 4 tests pass.
 
 - [ ] **Step 5: Implement Paths helper**
 
-Create `lightio-cli/Sources/LightioCore/Paths.swift`:
+Create `cclight-cli/Sources/CCLightCore/Paths.swift`:
 
 ```swift
 import Foundation
 
-/// Resolves the paths lightio reads/writes. Honors `VIBELIGHT_STATE_DIR`
-/// for tests so we never touch the user's real `~/.lightio`.
+/// Resolves the paths cclight reads/writes. Honors `VIBELIGHT_STATE_DIR`
+/// for tests so we never touch the user's real `~/.cclight`.
 public enum Paths {
     public static var stateDir: URL {
         if let override = ProcessInfo.processInfo.environment["VIBELIGHT_STATE_DIR"] {
             return URL(fileURLWithPath: override)
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent(".lightio", isDirectory: true)
+        return home.appendingPathComponent(".cclight", isDirectory: true)
     }
 
     public static var stateFile: URL {
@@ -335,9 +335,9 @@ public enum Paths {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/SessionState.swift \
-        lightio-cli/Sources/LightioCore/Paths.swift \
-        lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift
+git add cclight-cli/Sources/CCLightCore/SessionState.swift \
+        cclight-cli/Sources/CCLightCore/Paths.swift \
+        cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift
 git commit -m "Add SessionState + MergedState + Paths"
 ```
 
@@ -346,23 +346,23 @@ git commit -m "Add SessionState + MergedState + Paths"
 ## Task 3: StateFile — atomic JSON read/write
 
 **Files:**
-- Create: `lightio-cli/Sources/LightioCore/StateFile.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/StateFileTests.swift`
+- Create: `cclight-cli/Sources/CCLightCore/StateFile.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/StateFileTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `lightio-cli/Tests/LightioCoreTests/StateFileTests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/StateFileTests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class StateFileTests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-tests-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
     }
@@ -436,12 +436,12 @@ Expected: build error — `StateSnapshot`, `StateFile` not defined.
 
 - [ ] **Step 3: Implement StateSnapshot + StateFile**
 
-Create `lightio-cli/Sources/LightioCore/StateFile.swift`:
+Create `cclight-cli/Sources/CCLightCore/StateFile.swift`:
 
 ```swift
 import Foundation
 
-/// In-memory representation of `~/.lightio/state.json`.
+/// In-memory representation of `~/.cclight/state.json`.
 public struct StateSnapshot: Codable, Equatable, Sendable {
     public var version: Int
     public var sessions: [String: SessionEntry]
@@ -476,7 +476,7 @@ public enum StateFile {
             if data.isEmpty { return StateSnapshot() }
             return try JSONDecoder().decode(StateSnapshot.self, from: data)
         } catch {
-            FileHandle.standardError.write(Data("lightio: malformed state.json: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("cclight: malformed state.json: \(error)\n".utf8))
             return StateSnapshot()
         }
     }
@@ -520,8 +520,8 @@ Expected: all 5 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/StateFile.swift \
-        lightio-cli/Tests/LightioCoreTests/StateFileTests.swift
+git add cclight-cli/Sources/CCLightCore/StateFile.swift \
+        cclight-cli/Tests/CCLightCoreTests/StateFileTests.swift
 git commit -m "Add StateFile with atomic write and tests"
 ```
 
@@ -530,16 +530,16 @@ git commit -m "Add StateFile with atomic write and tests"
 ## Task 4: HookInputJSON — parse Claude Code's stdin payload
 
 **Files:**
-- Create: `lightio-cli/Sources/LightioCore/HookInputJSON.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift`
+- Create: `cclight-cli/Sources/CCLightCore/HookInputJSON.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/HookInputJSONTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/HookInputJSONTests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class HookInputJSONTests: XCTestCase {
     func testParsesFullPayload() throws {
@@ -588,7 +588,7 @@ Expected: build error.
 
 - [ ] **Step 3: Implement HookInputJSON**
 
-Create `lightio-cli/Sources/LightioCore/HookInputJSON.swift`:
+Create `cclight-cli/Sources/CCLightCore/HookInputJSON.swift`:
 
 ```swift
 import Foundation
@@ -627,8 +627,8 @@ Expected: 4 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/HookInputJSON.swift \
-        lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift
+git add cclight-cli/Sources/CCLightCore/HookInputJSON.swift \
+        cclight-cli/Tests/CCLightCoreTests/HookInputJSONTests.swift
 git commit -m "Add permissive HookInputJSON parser"
 ```
 
@@ -637,25 +637,25 @@ git commit -m "Add permissive HookInputJSON parser"
 ## Task 5: CLI commands `set` / `clear` / `status`
 
 **Files:**
-- Modify: `lightio-cli/Sources/lightio/main.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/CLITests.swift`
+- Modify: `cclight-cli/Sources/cclight/main.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/CLITests.swift`
 
 - [ ] **Step 1: Write the failing CLI integration tests**
 
-Create `lightio-cli/Tests/LightioCoreTests/CLITests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/CLITests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
-/// Integration tests that spawn the compiled `lightio` binary.
+/// Integration tests that spawn the compiled `cclight` binary.
 /// They locate the binary via DerivedBuilds in `.build/`.
 final class CLITests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-cli-tests-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-cli-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
@@ -697,19 +697,19 @@ final class CLITests: XCTestCase {
     // MARK: - Helpers
 
     private func cliBinary() -> URL {
-        // SwiftPM puts the executable at .build/{arch}-apple-macosx/debug/lightio.
+        // SwiftPM puts the executable at .build/{arch}-apple-macosx/debug/cclight.
         // Tests run from the package root, but we resolve relative to this file.
         let here = URL(fileURLWithPath: #filePath)
-        let pkgRoot = here.deletingLastPathComponent()  // LightioCoreTests
+        let pkgRoot = here.deletingLastPathComponent()  // CCLightCoreTests
             .deletingLastPathComponent()                 // Tests
-            .deletingLastPathComponent()                 // lightio-cli
-        let debug = pkgRoot.appendingPathComponent(".build/debug/lightio")
+            .deletingLastPathComponent()                 // cclight-cli
+        let debug = pkgRoot.appendingPathComponent(".build/debug/cclight")
         if FileManager.default.fileExists(atPath: debug.path) { return debug }
         // Fallback: search the arch-specific dir
         let arches = (try? FileManager.default.contentsOfDirectory(
             atPath: pkgRoot.appendingPathComponent(".build").path)) ?? []
         for arch in arches where arch.contains("apple-macosx") {
-            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/lightio")
+            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/cclight")
             if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
         }
         return debug
@@ -745,23 +745,23 @@ final class CLITests: XCTestCase {
 - [ ] **Step 2: Run tests to confirm they fail**
 
 ```bash
-cd /Users/jianshuo/code/lightio/lightio-cli
+cd /Users/jianshuo/code/cclight/cclight-cli
 swift build  # ensures the binary exists for the integration test
 swift test --filter CLITests
 ```
 
-Expected: all 4 tests fail — `lightio set` prints "lightio (stub)" and exits 0 without writing state.
+Expected: all 4 tests fail — `cclight set` prints "cclight (stub)" and exits 0 without writing state.
 
 - [ ] **Step 3: Implement CLI dispatch**
 
-Replace `lightio-cli/Sources/lightio/main.swift`:
+Replace `cclight-cli/Sources/cclight/main.swift`:
 
 ```swift
 import Foundation
-import LightioCore
+import CCLightCore
 
 @main
-struct LightioCLI {
+struct CCLightCLI {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
         let exitCode = run(args)
@@ -779,7 +779,7 @@ struct LightioCLI {
                 guard args.count >= 2,
                       let state = SessionState(rawValue: args[1])
                 else {
-                    FileHandle.standardError.write(Data("Usage: lightio set <working|waiting>\n".utf8))
+                    FileHandle.standardError.write(Data("Usage: cclight set <working|waiting>\n".utf8))
                     return 2
                 }
                 let input = try HookInputJSON.parse(readStdin())
@@ -809,11 +809,11 @@ struct LightioCLI {
                 return 0
 
             default:
-                FileHandle.standardError.write(Data("Usage: lightio <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
+                FileHandle.standardError.write(Data("Usage: cclight <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
                 return 2
             }
         } catch {
-            FileHandle.standardError.write(Data("lightio: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("cclight: \(error)\n".utf8))
             return 1
         }
     }
@@ -833,12 +833,12 @@ struct LightioCLI {
 
     static func printUsage() {
         let msg = """
-        Usage: lightio <command>
+        Usage: cclight <command>
           set <working|waiting>    Update this session's state (reads hook JSON from stdin)
           clear                    Remove this session (reads hook JSON from stdin)
           status                   Print current state.json
-          install-hooks            Install lightio hooks into ~/.claude/settings.json
-          uninstall-hooks          Remove lightio hooks from ~/.claude/settings.json
+          install-hooks            Install cclight hooks into ~/.claude/settings.json
+          uninstall-hooks          Remove cclight hooks from ~/.claude/settings.json
         """
         FileHandle.standardError.write(Data((msg + "\n").utf8))
     }
@@ -857,9 +857,9 @@ Expected: all 4 CLITests pass. (`install-hooks` / `uninstall-hooks` will hit the
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/lightio/main.swift \
-        lightio-cli/Tests/LightioCoreTests/CLITests.swift
-git commit -m "Implement lightio set/clear/status commands"
+git add cclight-cli/Sources/cclight/main.swift \
+        cclight-cli/Tests/CCLightCoreTests/CLITests.swift
+git commit -m "Implement cclight set/clear/status commands"
 ```
 
 ---
@@ -867,23 +867,23 @@ git commit -m "Implement lightio set/clear/status commands"
 ## Task 6: HookInstaller — patch `~/.claude/settings.json`
 
 **Files:**
-- Create: `lightio-cli/Sources/LightioCore/HookInstaller.swift`
-- Create: `lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift`
+- Create: `cclight-cli/Sources/CCLightCore/HookInstaller.swift`
+- Create: `cclight-cli/Tests/CCLightCoreTests/HookInstallerTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/HookInstallerTests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class HookInstallerTests: XCTestCase {
     var tempHome: URL!
 
     override func setUpWithError() throws {
         tempHome = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-hookinstaller-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-hookinstaller-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             at: tempHome.appendingPathComponent(".claude"),
             withIntermediateDirectories: true
@@ -897,7 +897,7 @@ final class HookInstallerTests: XCTestCase {
     private var settingsURL: URL { tempHome.appendingPathComponent(".claude/settings.json") }
 
     func testInstallIntoMissingSettingsCreatesFile() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -913,19 +913,19 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"otherKey": 42, "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         XCTAssertEqual(json["otherKey"] as? Int, 42)
         let hooks = json["hooks"] as! [String: Any]
         XCTAssertNotNil(hooks["PreToolUse"], "existing hook should be preserved")
-        XCTAssertNotNil(hooks["UserPromptSubmit"], "lightio hook should be installed")
+        XCTAssertNotNil(hooks["UserPromptSubmit"], "cclight hook should be installed")
     }
 
     func testInstallIsIdempotent() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -938,19 +938,19 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"hooks":{}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
-        let backupURL = settingsURL.appendingPathExtension("lightio-backup")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+        let backupURL = settingsURL.appendingPathExtension("cclight-backup")
         XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
         let backupData = try String(contentsOf: backupURL)
         XCTAssertEqual(backupData, existing)
 
         // Second install must NOT overwrite the backup (which would lose original)
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
         let backupDataAfter = try String(contentsOf: backupURL)
         XCTAssertEqual(backupDataAfter, existing, "backup must remain the original")
     }
 
-    func testUninstallRemovesLightioHooksKeepsOthers() throws {
+    func testUninstallRemovesCCLightHooksKeepsOthers() throws {
         let existing = """
         {
           "hooks": {
@@ -960,14 +960,14 @@ final class HookInstallerTests: XCTestCase {
         """
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
         try HookInstaller.uninstall(settingsURL: settingsURL)
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         let hooks = json["hooks"] as! [String: Any]
-        XCTAssertNotNil(hooks["PreToolUse"], "non-lightio hook preserved")
-        XCTAssertNil(hooks["UserPromptSubmit"], "lightio hook removed")
+        XCTAssertNotNil(hooks["PreToolUse"], "non-cclight hook preserved")
+        XCTAssertNil(hooks["UserPromptSubmit"], "cclight hook removed")
     }
 }
 ```
@@ -982,16 +982,16 @@ Expected: build error — `HookInstaller` not defined.
 
 - [ ] **Step 3: Implement HookInstaller**
 
-Create `lightio-cli/Sources/LightioCore/HookInstaller.swift`:
+Create `cclight-cli/Sources/CCLightCore/HookInstaller.swift`:
 
 ```swift
 import Foundation
 
 public enum HookInstaller {
     /// Marker we embed in each command string so uninstall can find our hooks.
-    public static let marker = "lightio"
+    public static let marker = "cclight"
 
-    /// Hook events lightio installs.
+    /// Hook events cclight installs.
     static let hookEvents: [(event: String, args: String)] = [
         ("SessionStart",     "set waiting"),
         ("UserPromptSubmit", "set working"),
@@ -1000,9 +1000,9 @@ public enum HookInstaller {
         ("SessionEnd",       "clear"),
     ]
 
-    /// Install lightio hooks into the given settings.json (creating the file
-    /// if missing). Existing non-lightio hooks are preserved. A one-time
-    /// backup is written to `<file>.lightio-backup`.
+    /// Install cclight hooks into the given settings.json (creating the file
+    /// if missing). Existing non-cclight hooks are preserved. A one-time
+    /// backup is written to `<file>.cclight-backup`.
     public static func install(settingsURL: URL, binaryPath: String) throws {
         try writeBackupIfNeeded(settingsURL: settingsURL)
 
@@ -1011,7 +1011,7 @@ public enum HookInstaller {
 
         for (event, args) in hookEvents {
             var entries = (hooks[event] as? [[String: Any]]) ?? []
-            entries.removeAll { isLightioEntry($0) }
+            entries.removeAll { isCCLightEntry($0) }
             entries.append([
                 "hooks": [[
                     "type": "command",
@@ -1025,7 +1025,7 @@ public enum HookInstaller {
         try writeSettings(json, to: settingsURL)
     }
 
-    /// Remove lightio hooks. Non-lightio hooks are preserved.
+    /// Remove cclight hooks. Non-cclight hooks are preserved.
     public static func uninstall(settingsURL: URL) throws {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return }
         var json = try readSettings(settingsURL)
@@ -1033,7 +1033,7 @@ public enum HookInstaller {
 
         for (event, _) in hookEvents {
             guard var entries = hooks[event] as? [[String: Any]] else { continue }
-            entries.removeAll { isLightioEntry($0) }
+            entries.removeAll { isCCLightEntry($0) }
             if entries.isEmpty {
                 hooks.removeValue(forKey: event)
             } else {
@@ -1046,7 +1046,7 @@ public enum HookInstaller {
 
     // MARK: - Helpers
 
-    private static func isLightioEntry(_ entry: [String: Any]) -> Bool {
+    private static func isCCLightEntry(_ entry: [String: Any]) -> Bool {
         guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
         return inner.contains { ($0["command"] as? String)?.contains(marker) == true }
     }
@@ -1073,7 +1073,7 @@ public enum HookInstaller {
     }
 
     private static func writeBackupIfNeeded(settingsURL: URL) throws {
-        let backup = settingsURL.appendingPathExtension("lightio-backup")
+        let backup = settingsURL.appendingPathExtension("cclight-backup")
         guard FileManager.default.fileExists(atPath: settingsURL.path),
               !FileManager.default.fileExists(atPath: backup.path)
         else { return }
@@ -1093,9 +1093,9 @@ Expected: all 5 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/HookInstaller.swift \
-        lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift
-git commit -m "Add HookInstaller: install/uninstall lightio hooks"
+git add cclight-cli/Sources/CCLightCore/HookInstaller.swift \
+        cclight-cli/Tests/CCLightCoreTests/HookInstallerTests.swift
+git commit -m "Add HookInstaller: install/uninstall cclight hooks"
 ```
 
 ---
@@ -1103,12 +1103,12 @@ git commit -m "Add HookInstaller: install/uninstall lightio hooks"
 ## Task 7: CLI `install-hooks` / `uninstall-hooks` commands
 
 **Files:**
-- Modify: `lightio-cli/Sources/lightio/main.swift`
-- Modify: `lightio-cli/Tests/LightioCoreTests/CLITests.swift`
+- Modify: `cclight-cli/Sources/cclight/main.swift`
+- Modify: `cclight-cli/Tests/CCLightCoreTests/CLITests.swift`
 
 - [ ] **Step 1: Add failing CLI tests for the new commands**
 
-Append to `lightio-cli/Tests/LightioCoreTests/CLITests.swift` inside the test class:
+Append to `cclight-cli/Tests/CCLightCoreTests/CLITests.swift` inside the test class:
 
 ```swift
     func testInstallHooksPatchesSettingsFile() throws {
@@ -1132,7 +1132,7 @@ Append to `lightio-cli/Tests/LightioCoreTests/CLITests.swift` inside the test cl
         XCTAssertNotNil(hooks["UserPromptSubmit"])
     }
 
-    func testUninstallHooksRemovesLightioOnly() throws {
+    func testUninstallHooksRemovesCCLightOnly() throws {
         let fakeHome = tempDir.appendingPathComponent("home")
         try FileManager.default.createDirectory(
             at: fakeHome.appendingPathComponent(".claude"),
@@ -1182,29 +1182,29 @@ Update the `runCLI` helper signature to accept extra env vars. Replace the exist
 
 ```bash
 swift test --filter CLITests/testInstallHooksPatchesSettingsFile
-swift test --filter CLITests/testUninstallHooksRemovesLightioOnly
+swift test --filter CLITests/testUninstallHooksRemovesCCLightOnly
 ```
 
 Expected: both fail because main.swift still hits the "Usage" branch.
 
 - [ ] **Step 3: Wire install-hooks / uninstall-hooks in main.swift**
 
-In `lightio-cli/Sources/lightio/main.swift`, replace the `default:` case in the switch statement with:
+In `cclight-cli/Sources/cclight/main.swift`, replace the `default:` case in the switch statement with:
 
 ```swift
             case "install-hooks":
-                let binaryPath = "/usr/local/bin/lightio"
+                let binaryPath = "/usr/local/bin/cclight"
                 try HookInstaller.install(settingsURL: Paths.claudeSettingsFile, binaryPath: binaryPath)
-                FileHandle.standardOutput.write(Data("Installed lightio hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
+                FileHandle.standardOutput.write(Data("Installed cclight hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
                 return 0
 
             case "uninstall-hooks":
                 try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
-                FileHandle.standardOutput.write(Data("Removed lightio hooks from \(Paths.claudeSettingsFile.path)\n".utf8))
+                FileHandle.standardOutput.write(Data("Removed cclight hooks from \(Paths.claudeSettingsFile.path)\n".utf8))
                 return 0
 
             default:
-                FileHandle.standardError.write(Data("Usage: lightio <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
+                FileHandle.standardError.write(Data("Usage: cclight <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
                 return 2
 ```
 
@@ -1222,8 +1222,8 @@ Expected: all 6 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/lightio/main.swift \
-        lightio-cli/Tests/LightioCoreTests/CLITests.swift
+git add cclight-cli/Sources/cclight/main.swift \
+        cclight-cli/Tests/CCLightCoreTests/CLITests.swift
 git commit -m "Wire install-hooks/uninstall-hooks into CLI"
 ```
 
@@ -1232,14 +1232,14 @@ git commit -m "Wire install-hooks/uninstall-hooks into CLI"
 ## Task 8: StateStore — merge function (pure, in app target)
 
 **Files:**
-- Create: `lightio/StateStore.swift`
-- Create: `lightio/StateStoreMergeTests.swift` (will need a test target later — for now we test via the SwiftPM tests since the merge function will live in LightioCore)
+- Create: `cclight/StateStore.swift`
+- Create: `cclight/StateStoreMergeTests.swift` (will need a test target later — for now we test via the SwiftPM tests since the merge function will live in CCLightCore)
 
-**Note:** Since the app target doesn't have a test target yet, push the pure merge logic into `LightioCore`. The `MergedState.merge(_:)` from Task 2 already accepts `[SessionState]`. We add a higher-level wrapper that takes the full `StateSnapshot`.
+**Note:** Since the app target doesn't have a test target yet, push the pure merge logic into `CCLightCore`. The `MergedState.merge(_:)` from Task 2 already accepts `[SessionState]`. We add a higher-level wrapper that takes the full `StateSnapshot`.
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift` inside the class:
+Append to `cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift` inside the class:
 
 ```swift
     func testMergeFromSnapshot() {
@@ -1269,7 +1269,7 @@ Expected: build error — no overload for `merge(snapshot:)`.
 
 - [ ] **Step 3: Add the snapshot overload**
 
-In `lightio-cli/Sources/LightioCore/SessionState.swift`, append inside the `MergedState` enum after the existing `merge(_:)` method:
+In `cclight-cli/Sources/CCLightCore/SessionState.swift`, append inside the `MergedState` enum after the existing `merge(_:)` method:
 
 ```swift
     /// Convenience: derive the merged state directly from a state.json snapshot.
@@ -1289,8 +1289,8 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/SessionState.swift \
-        lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift
+git add cclight-cli/Sources/CCLightCore/SessionState.swift \
+        cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift
 git commit -m "Add MergedState.merge(snapshot:) convenience"
 ```
 
@@ -1299,21 +1299,21 @@ git commit -m "Add MergedState.merge(snapshot:) convenience"
 ## Task 9: StateStore — FSEvents wiring + publisher in the app
 
 **Files:**
-- Create: `lightio/StateStore.swift`
+- Create: `cclight/StateStore.swift`
 
 **Note:** This is in the Xcode app target. There's no app-target unit-test target in V1 (per spec's "minimal" stance), so we verify by manual smoke test in Task 16 plus the integration test added at the end of this task.
 
 - [ ] **Step 1: Implement StateStore**
 
-Create `lightio/StateStore.swift`:
+Create `cclight/StateStore.swift`:
 
 ```swift
 import Foundation
 import Combine
 import CoreServices
-import LightioCore
+import CCLightCore
 
-/// Watches `~/.lightio/state.json` and publishes the current merged state
+/// Watches `~/.cclight/state.json` and publishes the current merged state
 /// to subscribers. Owns the 5-minute idle timer.
 final class StateStore: ObservableObject {
     /// Currently-published state. NotchOverlay subscribes to this.
@@ -1422,7 +1422,7 @@ In Xcode, ⌘B. Expected: app target builds. We can't run it yet (no AppDelegate
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/StateStore.swift
+git add cclight/StateStore.swift
 git commit -m "Add StateStore: FSEvents watcher + idle timer"
 ```
 
@@ -1431,23 +1431,23 @@ git commit -m "Add StateStore: FSEvents watcher + idle timer"
 ## Task 10: NotchGeometry — pure rect computation
 
 **Files:**
-- Create: `lightio/NotchGeometry.swift`
-- Append: `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift` (test goes in the SwiftPM package since the geometry math is pure and we want tests, but we keep the file in the app target for runtime access)
+- Create: `cclight/NotchGeometry.swift`
+- Append: `cclight-cli/Tests/CCLightCoreTests/SessionStateTests.swift` (test goes in the SwiftPM package since the geometry math is pure and we want tests, but we keep the file in the app target for runtime access)
 
 **Note:** We duplicate the simple math logic in a way both contexts can use. The pure function takes screen size and notch dimensions as inputs, so it's easy to test with synthetic values.
 
-Actually — to keep DRY, we put the pure function in `LightioCore` and the app calls it.
+Actually — to keep DRY, we put the pure function in `CCLightCore` and the app calls it.
 
-- Create: `lightio-cli/Sources/LightioCore/NotchGeometry.swift`
-- Delete the plan to put it in the app target; replace the import with `import LightioCore`.
+- Create: `cclight-cli/Sources/CCLightCore/NotchGeometry.swift`
+- Delete the plan to put it in the app target; replace the import with `import CCLightCore`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `lightio-cli/Tests/LightioCoreTests/NotchGeometryTests.swift`:
+Create `cclight-cli/Tests/CCLightCoreTests/NotchGeometryTests.swift`:
 
 ```swift
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 import CoreGraphics
 
 final class NotchGeometryTests: XCTestCase {
@@ -1491,7 +1491,7 @@ Expected: build error — `NotchGeometry` not defined.
 
 - [ ] **Step 3: Implement NotchGeometry**
 
-Create `lightio-cli/Sources/LightioCore/NotchGeometry.swift`:
+Create `cclight-cli/Sources/CCLightCore/NotchGeometry.swift`:
 
 ```swift
 import CoreGraphics
@@ -1525,11 +1525,11 @@ Expected: both tests pass.
 
 - [ ] **Step 5: Add an app-side helper that pulls real values from NSScreen**
 
-Create `lightio/NotchGeometry+NSScreen.swift`:
+Create `cclight/NotchGeometry+NSScreen.swift`:
 
 ```swift
 import AppKit
-import LightioCore
+import CCLightCore
 
 extension NotchGeometry {
     /// Best-effort: read the notch dimensions from `NSScreen.safeAreaInsets`
@@ -1567,9 +1567,9 @@ extension NotchGeometry {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightio-cli/Sources/LightioCore/NotchGeometry.swift \
-        lightio-cli/Tests/LightioCoreTests/NotchGeometryTests.swift \
-        lightio/NotchGeometry+NSScreen.swift
+git add cclight-cli/Sources/CCLightCore/NotchGeometry.swift \
+        cclight-cli/Tests/CCLightCoreTests/NotchGeometryTests.swift \
+        cclight/NotchGeometry+NSScreen.swift
 git commit -m "Add NotchGeometry pure function + NSScreen helper"
 ```
 
@@ -1578,11 +1578,11 @@ git commit -m "Add NotchGeometry pure function + NSScreen helper"
 ## Task 11: NotchOverlayWindow — borderless transparent window
 
 **Files:**
-- Create: `lightio/NotchOverlayWindow.swift`
+- Create: `cclight/NotchOverlayWindow.swift`
 
 - [ ] **Step 1: Implement the window**
 
-Create `lightio/NotchOverlayWindow.swift`:
+Create `cclight/NotchOverlayWindow.swift`:
 
 ```swift
 import AppKit
@@ -1620,7 +1620,7 @@ final class NotchOverlayWindow: NSWindow {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio -destination 'platform=macOS' build 2>&1 | tail -20
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight -destination 'platform=macOS' build 2>&1 | tail -20
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1628,7 +1628,7 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/NotchOverlayWindow.swift
+git add cclight/NotchOverlayWindow.swift
 git commit -m "Add NotchOverlayWindow: borderless transparent click-through"
 ```
 
@@ -1637,17 +1637,17 @@ git commit -m "Add NotchOverlayWindow: borderless transparent click-through"
 ## Task 12: NotchOverlayView — CALayer glow rendering
 
 **Files:**
-- Create: `lightio/NotchOverlayView.swift`
+- Create: `cclight/NotchOverlayView.swift`
 
 - [ ] **Step 1: Implement the view**
 
-Create `lightio/NotchOverlayView.swift`:
+Create `cclight/NotchOverlayView.swift`:
 
 ```swift
 import AppKit
 import Combine
 import QuartzCore
-import LightioCore
+import CCLightCore
 
 /// Renders the glow underneath the notch. Driven by a published `MergedState`.
 final class NotchOverlayView: NSView {
@@ -1768,7 +1768,7 @@ final class NotchOverlayView: NSView {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio -destination 'platform=macOS' build 2>&1 | tail -10
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight -destination 'platform=macOS' build 2>&1 | tail -10
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1776,7 +1776,7 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/NotchOverlayView.swift
+git add cclight/NotchOverlayView.swift
 git commit -m "Add NotchOverlayView: CALayer glow rendering"
 ```
 
@@ -1785,11 +1785,11 @@ git commit -m "Add NotchOverlayView: CALayer glow rendering"
 ## Task 13: Ding pulse animation on state change
 
 **Files:**
-- Modify: `lightio/NotchOverlayView.swift`
+- Modify: `cclight/NotchOverlayView.swift`
 
 - [ ] **Step 1: Add the pulse animation**
 
-Replace the `applyState(_:animated:)` method in `lightio/NotchOverlayView.swift` with:
+Replace the `applyState(_:animated:)` method in `cclight/NotchOverlayView.swift` with:
 
 ```swift
     private func applyState(_ state: MergedState, animated: Bool) {
@@ -1854,7 +1854,7 @@ Replace the `applyState(_:animated:)` method in `lightio/NotchOverlayView.swift`
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -1862,7 +1862,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/NotchOverlayView.swift
+git add cclight/NotchOverlayView.swift
 git commit -m "Add ding-pulse animation on state change"
 ```
 
@@ -1871,16 +1871,16 @@ git commit -m "Add ding-pulse animation on state change"
 ## Task 14: MenuBarController — NSStatusItem + menu
 
 **Files:**
-- Create: `lightio/MenuBarController.swift`
+- Create: `cclight/MenuBarController.swift`
 
 - [ ] **Step 1: Implement the controller**
 
-Create `lightio/MenuBarController.swift`:
+Create `cclight/MenuBarController.swift`:
 
 ```swift
 import AppKit
 import Combine
-import LightioCore
+import CCLightCore
 
 /// Owns the menu-bar status item: a tinted dot whose color tracks the merged
 /// state, and a menu with the install/uninstall hooks actions.
@@ -1979,7 +1979,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let about = NSMenuItem(title: "About lightio", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: "About cclight", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
@@ -1987,7 +1987,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func stateMenuTitle() -> String {
-        guard let store = store else { return "lightio" }
+        guard let store = store else { return "cclight" }
         let stateLabel: String
         switch store.currentState {
         case .working: stateLabel = "WORKING"
@@ -2017,7 +2017,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -2025,7 +2025,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/MenuBarController.swift
+git add cclight/MenuBarController.swift
 git commit -m "Add MenuBarController: status item dot + menu"
 ```
 
@@ -2034,26 +2034,26 @@ git commit -m "Add MenuBarController: status item dot + menu"
 ## Task 15: FirstRun — symlink install, hook install dialog, launch-at-login
 
 **Files:**
-- Create: `lightio/FirstRun.swift`
+- Create: `cclight/FirstRun.swift`
 
 - [ ] **Step 1: Implement FirstRun**
 
-Create `lightio/FirstRun.swift`:
+Create `cclight/FirstRun.swift`:
 
 ```swift
 import AppKit
 import ServiceManagement
-import LightioCore
+import CCLightCore
 
 /// Handles one-time install steps on first launch and exposes "Install Hooks"
 /// as a re-runnable action.
 enum FirstRun {
-    static let symlinkPath = "/usr/local/bin/lightio"
+    static let symlinkPath = "/usr/local/bin/cclight"
 
     /// Path to the CLI bundled inside this .app.
     static var bundledCLIPath: String {
-        Bundle.main.resourcePath.map { "\($0)/lightio" }
-            ?? "/Applications/lightio.app/Contents/Resources/lightio"
+        Bundle.main.resourcePath.map { "\($0)/cclight" }
+            ?? "/Applications/cclight.app/Contents/Resources/cclight"
     }
 
     // MARK: - Symlink
@@ -2075,13 +2075,13 @@ enum FirstRun {
     static func installSymlinkInteractively() -> Bool {
         let escaped = bundledCLIPath.replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
-        do shell script "mkdir -p /usr/local/bin && ln -sf \\"\(escaped)\\" /usr/local/bin/lightio" with administrator privileges
+        do shell script "mkdir -p /usr/local/bin && ln -sf \\"\(escaped)\\" /usr/local/bin/cclight" with administrator privileges
         """
         var errorInfo: NSDictionary?
         let runner = NSAppleScript(source: script)
         _ = runner?.executeAndReturnError(&errorInfo)
         if let error = errorInfo {
-            NSLog("lightio symlink install failed: \(error)")
+            NSLog("cclight symlink install failed: \(error)")
             return false
         }
         return isSymlinkInstalled()
@@ -2101,8 +2101,8 @@ enum FirstRun {
         alert.messageText = "Install Claude Code Hooks?"
         alert.informativeText = """
         检测到 Claude Code (~/.claude/settings.json)。
-        是否将 lightio 的 hooks 加入其中？
-        原文件会备份到 settings.json.lightio-backup。
+        是否将 cclight 的 hooks 加入其中？
+        原文件会备份到 settings.json.cclight-backup。
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Install")
@@ -2122,7 +2122,7 @@ enum FirstRun {
             )
             return true
         } catch {
-            NSLog("lightio installHooks failed: \(error)")
+            NSLog("cclight installHooks failed: \(error)")
             return false
         }
     }
@@ -2133,7 +2133,7 @@ enum FirstRun {
             try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
             return true
         } catch {
-            NSLog("lightio uninstallHooks failed: \(error)")
+            NSLog("cclight uninstallHooks failed: \(error)")
             return false
         }
     }
@@ -2158,7 +2158,7 @@ enum FirstRun {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                NSLog("lightio setLaunchAtLogin failed: \(error)")
+                NSLog("cclight setLaunchAtLogin failed: \(error)")
             }
         }
     }
@@ -2168,7 +2168,7 @@ enum FirstRun {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -2176,7 +2176,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add lightio/FirstRun.swift
+git add cclight/FirstRun.swift
 git commit -m "Add FirstRun: symlink, hooks dialog, launch-at-login"
 ```
 
@@ -2185,19 +2185,19 @@ git commit -m "Add FirstRun: symlink, hooks dialog, launch-at-login"
 ## Task 16: AppDelegate — wire everything together
 
 **Files:**
-- Create: `lightio/AppDelegate.swift`
-- Modify: `lightio/lightioApp.swift`
-- Delete: `lightio/ContentView.swift`
+- Create: `cclight/AppDelegate.swift`
+- Modify: `cclight/cclightApp.swift`
+- Delete: `cclight/ContentView.swift`
 - Configure: Info.plist (via Xcode UI, `LSUIElement = YES`)
 
 - [ ] **Step 1: Write the AppDelegate**
 
-Create `lightio/AppDelegate.swift`:
+Create `cclight/AppDelegate.swift`:
 
 ```swift
 import AppKit
 import SwiftUI
-import LightioCore
+import CCLightCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: StateStore!
@@ -2220,7 +2220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayWindow.orderFrontRegardless()
             overlayView.bind(store.$currentState)
         } else {
-            NSLog("lightio: no notch detected; overlay disabled")
+            NSLog("cclight: no notch detected; overlay disabled")
         }
 
         // 3. Build menu bar
@@ -2249,9 +2249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Symlink
         if !FirstRun.isSymlinkInstalled() {
             let alert = NSAlert()
-            alert.messageText = "Install lightio CLI?"
+            alert.messageText = "Install cclight CLI?"
             alert.informativeText = """
-            需要把 CLI 安装到 /usr/local/bin/lightio，
+            需要把 CLI 安装到 /usr/local/bin/cclight，
             这一步需要管理员密码（一次性）。
             """
             alert.addButton(withTitle: "Install")
@@ -2262,7 +2262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Hooks
         if FirstRun.claudeSettingsExists() {
-            // Only offer if lightio hooks aren't already there.
+            // Only offer if cclight hooks aren't already there.
             if (try? Data(contentsOf: Paths.claudeSettingsFile))
                 .flatMap({ String(data: $0, encoding: .utf8) })?
                 .contains(HookInstaller.marker) != true {
@@ -2279,7 +2279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if FirstRun.installHooks() {
             let alert = NSAlert()
             alert.messageText = "Hooks installed"
-            alert.informativeText = "lightio hooks added to ~/.claude/settings.json"
+            alert.informativeText = "cclight hooks added to ~/.claude/settings.json"
             alert.runModal()
         } else {
             let alert = NSAlert()
@@ -2311,7 +2311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 - [ ] **Step 2: Expose `previewState` on NotchOverlayView**
 
-Append to `lightio/NotchOverlayView.swift` inside the class:
+Append to `cclight/NotchOverlayView.swift` inside the class:
 
 ```swift
     /// Force the view to a specific state without going through the publisher.
@@ -2323,13 +2323,13 @@ Append to `lightio/NotchOverlayView.swift` inside the class:
 
 - [ ] **Step 3: Replace the SwiftUI App entry to use AppDelegate**
 
-Edit `lightio/lightioApp.swift` to be:
+Edit `cclight/cclightApp.swift` to be:
 
 ```swift
 import SwiftUI
 
 @main
-struct lightioApp: App {
+struct cclightApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -2343,13 +2343,13 @@ struct lightioApp: App {
 - [ ] **Step 4: Delete the obsolete ContentView**
 
 ```bash
-rm /Users/jianshuo/code/lightio/lightio/ContentView.swift
+rm /Users/jianshuo/code/cclight/cclight/ContentView.swift
 ```
 
 - [ ] **Step 5: Set LSUIElement in Info.plist (via Xcode UI)**
 
 In Xcode:
-1. Select the `lightio` target → "Info" tab (or open the Info.plist editor in the project navigator).
+1. Select the `cclight` target → "Info" tab (or open the Info.plist editor in the project navigator).
 2. Add a new key: `Application is agent (UIElement)` (raw key: `LSUIElement`), type Boolean, value `YES`.
 3. Save.
 
@@ -2358,7 +2358,7 @@ This hides the Dock icon and turns the app into a menu-bar-only agent.
 - [ ] **Step 6: Build the app**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -10
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build 2>&1 | tail -10
 ```
 
 Expected: build succeeds.
@@ -2366,14 +2366,14 @@ Expected: build succeeds.
 - [ ] **Step 7: Manual smoke test — launch and observe**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build
-APP=$(find ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app -maxdepth 0 -type d | head -1)
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build
+APP=$(find ~/Library/Developer/Xcode/DerivedData/cclight-*/Build/Products/Debug/cclight.app -maxdepth 0 -type d | head -1)
 open "$APP"
 ```
 
 Manually verify:
-- Dock has NO lightio icon
-- Menu bar shows a small dim circle (lightio)
+- Dock has NO cclight icon
+- Menu bar shows a small dim circle (cclight)
 - The notch glows green for ~1s then dims
 - Clicking the menu bar item shows the menu with "Install Claude Code Hooks" etc.
 - "Quit" exits the app cleanly
@@ -2383,11 +2383,11 @@ Document any issues in a scratch note for later. If a critical failure (no notch
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lightio/AppDelegate.swift \
-        lightio/lightioApp.swift \
-        lightio/NotchOverlayView.swift \
-        lightio.xcodeproj
-git rm lightio/ContentView.swift
+git add cclight/AppDelegate.swift \
+        cclight/cclightApp.swift \
+        cclight/NotchOverlayView.swift \
+        cclight.xcodeproj
+git rm cclight/ContentView.swift
 git commit -m "Wire AppDelegate: overlay + menu bar + first-run + LSUIElement"
 ```
 
@@ -2400,15 +2400,15 @@ git commit -m "Wire AppDelegate: overlay + menu bar + first-run + LSUIElement"
 - [ ] **Step 1: Build a fresh debug build**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build
+xcodebuild -project /Users/jianshuo/code/cclight/cclight.xcodeproj -scheme cclight build
 ```
 
 - [ ] **Step 2: Locate, copy and launch the .app**
 
 ```bash
-APP=$(find ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app -maxdepth 0 -type d | head -1)
+APP=$(find ~/Library/Developer/Xcode/DerivedData/cclight-*/Build/Products/Debug/cclight.app -maxdepth 0 -type d | head -1)
 cp -R "$APP" /Applications/
-open /Applications/lightio.app
+open /Applications/cclight.app
 ```
 
 - [ ] **Step 3: Walk through first-run flow**
@@ -2418,13 +2418,13 @@ When the hooks dialog appears → "Install".
 
 Verify:
 ```bash
-ls -l /usr/local/bin/lightio
+ls -l /usr/local/bin/cclight
 cat ~/.claude/settings.json | python3 -m json.tool | head -40
 ```
 
 Expected:
-- `/usr/local/bin/lightio` is a symlink to the bundled binary
-- `~/.claude/settings.json` has 5 hook events with commands containing `lightio`
+- `/usr/local/bin/cclight` is a symlink to the bundled binary
+- `~/.claude/settings.json` has 5 hook events with commands containing `cclight`
 
 - [ ] **Step 4: Run a real Claude Code session and observe**
 
@@ -2444,25 +2444,25 @@ Then in Claude Code, type a prompt (e.g., "list files") and watch the notch:
 
 If any state doesn't show: check
 ```bash
-cat ~/.lightio/state.json
-lightio status
+cat ~/.cclight/state.json
+cclight status
 ```
 
 - [ ] **Step 5: Test uninstall flow**
 
 ```bash
-lightio uninstall-hooks
-cat ~/.claude/settings.json | python3 -m json.tool | grep -i lightio
+cclight uninstall-hooks
+cat ~/.claude/settings.json | python3 -m json.tool | grep -i cclight
 ```
 
-Expected: no lightio commands in settings.json.
+Expected: no cclight commands in settings.json.
 
 Reinstall via menu bar → "Install Claude Code Hooks". Verify it comes back.
 
 - [ ] **Step 6: Verify state.json schema**
 
 ```bash
-cat ~/.lightio/state.json | python3 -m json.tool
+cat ~/.cclight/state.json | python3 -m json.tool
 ```
 
 Expected: matches the schema in the spec — `version: 1`, `sessions` map with `state`, `ts`, optional `cwd` per entry.
@@ -2471,7 +2471,7 @@ Expected: matches the schema in the spec — `version: 1`, `sessions` map with `
 
 Open a temporary note (NOT committed) summarizing what worked, what didn't. For each issue:
 - If small (typo, label, color tweak) — fix in code, commit a follow-up.
-- If structural — capture as a known-issue line in `docs/superpowers/specs/2026-05-28-lightio-design.md` under "Section 10. Risks & open questions".
+- If structural — capture as a known-issue line in `docs/superpowers/specs/2026-05-28-cclight-design.md` under "Section 10. Risks & open questions".
 
 - [ ] **Step 8: Final commit (if any fixups)**
 
@@ -2483,7 +2483,7 @@ git commit -m "Post-E2E verification fixups"
 - [ ] **Step 9: Tag V1**
 
 ```bash
-git tag v0.1.0 -m "lightio V1 — local install"
+git tag v0.1.0 -m "cclight V1 — local install"
 ```
 
 V1 ship complete.
@@ -2515,7 +2515,7 @@ One follow-up I'll handle as a minor edit-in-task rather than a new task: Task 9
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-05-28-lightio-v1.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-05-28-cclight-v1.md`.
 
 Two execution options:
 

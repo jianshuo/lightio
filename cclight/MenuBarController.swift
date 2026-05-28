@@ -1,6 +1,6 @@
 import AppKit
 import Combine
-import LightioCore
+import CCLightCore
 
 private extension Array {
     subscript(safe index: Int) -> Element? {
@@ -122,7 +122,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         launchItem.state = isLaunchAtLoginOn() ? .on : .off
         menu.addItem(launchItem)
 
-        let about = NSMenuItem(title: "About Lightio", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: "About CCLight", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
@@ -130,7 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     /// Pick a human-readable display name. Prefer the cwd's last path component
-    /// (e.g. `lightio` for `/Users/x/code/lightio`); fall back to the
+    /// (e.g. `cclight` for `/Users/x/code/cclight`); fall back to the
     /// short session id.
     private static func displayName(cwd: String?, id: String?) -> String {
         if let cwd = cwd, !cwd.isEmpty {

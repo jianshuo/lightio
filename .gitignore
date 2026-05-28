@@ -6,6 +6,6 @@ xcuserdata/
 *.xcuserstate
 
 # SwiftPM
-lightio-cli/.build/
-lightio-cli/.swiftpm/
-lightio-cli/Package.resolved
+cclight-cli/.build/
+cclight-cli/.swiftpm/
+cclight-cli/Package.resolved

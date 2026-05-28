@@ -1,9 +1,9 @@
 import Foundation
 import Combine
 import CoreServices
-import LightioCore
+import CCLightCore
 
-/// Watches `~/.lightio/state.json` and publishes the current merged state
+/// Watches `~/.cclight/state.json` and publishes the current merged state
 /// to subscribers. Owns the 5-minute idle timer.
 final class StateStore: ObservableObject {
     /// Merged state across all sessions (priority working > waiting > idle).
@@ -94,7 +94,7 @@ final class StateStore: ObservableObject {
         let pruned = rawSnapshot.sessions.count - liveSessions.count
 
         let merged = MergedState.merge(snapshot: snapshot)
-        NSLog("lightio: reload — \(snapshot.sessions.count) session(s) (pruned \(pruned)), merged=\(merged)")
+        NSLog("cclight: reload — \(snapshot.sessions.count) session(s) (pruned \(pruned)), merged=\(merged)")
         // Cap at 4 most-recently-active sessions for display.
         let topSessions = snapshot.sessions
             .sorted { $0.value.ts > $1.value.ts }  // newest first

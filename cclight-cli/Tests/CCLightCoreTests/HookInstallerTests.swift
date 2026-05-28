@@ -1,12 +1,12 @@
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class HookInstallerTests: XCTestCase {
     var tempHome: URL!
 
     override func setUpWithError() throws {
         tempHome = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-hookinstaller-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-hookinstaller-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             at: tempHome.appendingPathComponent(".claude"),
             withIntermediateDirectories: true
@@ -20,7 +20,7 @@ final class HookInstallerTests: XCTestCase {
     private var settingsURL: URL { tempHome.appendingPathComponent(".claude/settings.json") }
 
     func testInstallIntoMissingSettingsCreatesFile() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -36,19 +36,19 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"otherKey": 42, "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         XCTAssertEqual(json["otherKey"] as? Int, 42)
         let hooks = json["hooks"] as! [String: Any]
         XCTAssertNotNil(hooks["PreToolUse"], "existing hook should be preserved")
-        XCTAssertNotNil(hooks["UserPromptSubmit"], "lightio hook should be installed")
+        XCTAssertNotNil(hooks["UserPromptSubmit"], "cclight hook should be installed")
     }
 
     func testInstallIsIdempotent() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -61,20 +61,20 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"hooks":{}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
-        let backupURL = settingsURL.appendingPathExtension("lightio-backup")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+        let backupURL = settingsURL.appendingPathExtension("cclight-backup")
         XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
         let backupData = try String(contentsOf: backupURL)
         XCTAssertEqual(backupData, existing)
 
         // Second install must NOT overwrite the backup
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
         let backupDataAfter = try String(contentsOf: backupURL)
         XCTAssertEqual(backupDataAfter, existing, "backup must remain the original")
     }
 
     func testInstalledCommandIsWrappedForMissingBinary() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/nonexistent/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/nonexistent/cclight")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -99,7 +99,7 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertEqual(proc.terminationStatus, 0, "missing-binary hook must no-op cleanly")
     }
 
-    func testUninstallRemovesLightioHooksKeepsOthers() throws {
+    func testUninstallRemovesCCLightHooksKeepsOthers() throws {
         let existing = """
         {
           "hooks": {
@@ -109,13 +109,13 @@ final class HookInstallerTests: XCTestCase {
         """
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
         try HookInstaller.uninstall(settingsURL: settingsURL)
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         let hooks = json["hooks"] as! [String: Any]
-        XCTAssertNotNil(hooks["PreToolUse"], "non-lightio hook preserved")
-        XCTAssertNil(hooks["UserPromptSubmit"], "lightio hook removed")
+        XCTAssertNotNil(hooks["PreToolUse"], "non-cclight hook preserved")
+        XCTAssertNil(hooks["UserPromptSubmit"], "cclight hook removed")
     }
 }

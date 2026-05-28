@@ -1,7 +1,7 @@
-# Lightio
+# CCLight
 
-> 写作 / UI 上叫 **Lightio**，binary 叫 `Lightio`（`/Applications/Lightio.app`），
-> CLI 命令叫 `lightio`（`/usr/local/bin/lightio`）。
+> 写作 / UI 上叫 **CCLight**，binary 叫 `CCLight`（`/Applications/CCLight.app`），
+> CLI 命令叫 `cclight`（`/usr/local/bin/cclight`）。
 
 借用 Mac 灵动岛作为 Claude Code 状态指示器：
 低调的细线带着晕光环绕刘海。
@@ -43,14 +43,14 @@ Hooks子菜单包括了安装和uninstall
 
 | Hook | Command |
 |---|---|
-| `SessionStart` | `lightio set waiting` |
-| `UserPromptSubmit` | `lightio set working` |
-| `Stop` | `lightio set waiting` |
-| `Notification` | `lightio set waiting` |
-| `SessionEnd` | `lightio clear` |
+| `SessionStart` | `cclight set waiting` |
+| `UserPromptSubmit` | `cclight set working` |
+| `Stop` | `cclight set waiting` |
+| `Notification` | `cclight set waiting` |
+| `SessionEnd` | `cclight clear` |
 
-CLI 读 stdin JSON 取 `session_id` + `cwd`，原子写入 `~/.lightio/state.json`。
+CLI 读 stdin JSON 取 `session_id` + `cwd`，原子写入 `~/.cclight/state.json`。
 Mac app 通过 FSEvents 监听这个文件实时响应。
 
-CLI 安装到 `/usr/local/bin/lightio`（symlink 到 app bundle 内），
+CLI 安装到 `/usr/local/bin/cclight`（symlink 到 app bundle 内），
 首次启动时弹对话框走管理员授权。

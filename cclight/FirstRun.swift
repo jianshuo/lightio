@@ -1,6 +1,6 @@
 import AppKit
 import ServiceManagement
-import LightioCore
+import CCLightCore
 
 /// Handles one-time install steps on first launch and exposes "Install Hooks"
 /// as a re-runnable action.
@@ -18,7 +18,7 @@ enum FirstRun {
     /// `stopAccessingSecurityScopedResource` after.
     static func promptForClaudeAccess() -> URL? {
         let panel = NSOpenPanel()
-        panel.message = "Lightio needs one-time access to your ~/.claude folder to install the Claude Code hooks."
+        panel.message = "CCLight needs one-time access to your ~/.claude folder to install the Claude Code hooks."
         panel.prompt = "Grant Access"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -74,8 +74,8 @@ enum FirstRun {
         alert.messageText = "Install Claude Code Hooks?"
         alert.informativeText = """
         检测到 Claude Code (~/.claude/settings.json)。
-        是否将 lightio 的 hooks 加入其中？
-        原文件会备份到 settings.json.lightio-backup。
+        是否将 cclight 的 hooks 加入其中？
+        原文件会备份到 settings.json.cclight-backup。
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Install")
@@ -103,11 +103,11 @@ enum FirstRun {
         do {
             try HookInstaller.install(
                 settingsURL: settingsURL,
-                binaryPath: "/Applications/Lightio.app/Contents/Resources/lightio"
+                binaryPath: "/Applications/CCLight.app/Contents/Resources/cclight"
             )
             return true
         } catch {
-            NSLog("lightio installHooks failed: \(error)")
+            NSLog("cclight installHooks failed: \(error)")
             return false
         }
     }
@@ -122,7 +122,7 @@ enum FirstRun {
             try HookInstaller.uninstall(settingsURL: settingsURL)
             return true
         } catch {
-            NSLog("lightio uninstallHooks failed: \(error)")
+            NSLog("cclight uninstallHooks failed: \(error)")
             return false
         }
     }
@@ -147,7 +147,7 @@ enum FirstRun {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                NSLog("lightio setLaunchAtLogin failed: \(error)")
+                NSLog("cclight setLaunchAtLogin failed: \(error)")
             }
         }
     }

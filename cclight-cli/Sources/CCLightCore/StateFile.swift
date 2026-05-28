@@ -1,6 +1,6 @@
 import Foundation
 
-/// In-memory representation of `~/.lightio/state.json`.
+/// In-memory representation of `~/.cclight/state.json`.
 public struct StateSnapshot: Codable, Equatable, Sendable {
     public var version: Int
     public var sessions: [String: SessionEntry]
@@ -35,7 +35,7 @@ public enum StateFile {
             if data.isEmpty { return StateSnapshot() }
             return try JSONDecoder().decode(StateSnapshot.self, from: data)
         } catch {
-            FileHandle.standardError.write(Data("lightio: malformed state.json: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("cclight: malformed state.json: \(error)\n".utf8))
             return StateSnapshot()
         }
     }

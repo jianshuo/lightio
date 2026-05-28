@@ -7,17 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A0000000000000000001B0F2 /* LightioCore in Frameworks */ = {isa = PBXBuildFile; productRef = A0000000000000000001B0F1 /* LightioCore */; };
+		A0000000000000000001B0F2 /* CCLightCore in Frameworks */ = {isa = PBXBuildFile; productRef = A0000000000000000001B0F1 /* CCLightCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		D4D3F8612FC7FF63005965CA /* lightio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = lightio.app; path = Lightio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4D3F8612FC7FF63005965CA /* cclight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = cclight.app; path = CCLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D4D3F8632FC7FF63005965CA /* lightio */ = {
+		D4D3F8632FC7FF63005965CA /* cclight */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = lightio;
+			path = cclight;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -27,7 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A0000000000000000001B0F2 /* LightioCore in Frameworks */,
+				A0000000000000000001B0F2 /* CCLightCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -37,7 +37,7 @@
 		D4D3F8582FC7FF63005965CA = {
 			isa = PBXGroup;
 			children = (
-				D4D3F8632FC7FF63005965CA /* lightio */,
+				D4D3F8632FC7FF63005965CA /* cclight */,
 				D4D3F8622FC7FF63005965CA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		D4D3F8622FC7FF63005965CA /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D4D3F8612FC7FF63005965CA /* lightio.app */,
+				D4D3F8612FC7FF63005965CA /* cclight.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,28 +53,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D4D3F8602FC7FF63005965CA /* lightio */ = {
+		D4D3F8602FC7FF63005965CA /* cclight */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D4D3F86C2FC7FF65005965CA /* Build configuration list for PBXNativeTarget "lightio" */;
+			buildConfigurationList = D4D3F86C2FC7FF65005965CA /* Build configuration list for PBXNativeTarget "cclight" */;
 			buildPhases = (
 				D4D3F85D2FC7FF63005965CA /* Sources */,
 				D4D3F85E2FC7FF63005965CA /* Frameworks */,
 				D4D3F85F2FC7FF63005965CA /* Resources */,
-				A0000000000000000001B0F3 /* Embed lightio CLI */,
+				A0000000000000000001B0F3 /* Embed cclight CLI */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D4D3F8632FC7FF63005965CA /* lightio */,
+				D4D3F8632FC7FF63005965CA /* cclight */,
 			);
-			name = lightio;
+			name = cclight;
 			packageProductDependencies = (
-				A0000000000000000001B0F1 /* LightioCore */,
+				A0000000000000000001B0F1 /* CCLightCore */,
 			);
-			productName = lightio;
-			productReference = D4D3F8612FC7FF63005965CA /* lightio.app */;
+			productName = cclight;
+			productReference = D4D3F8612FC7FF63005965CA /* cclight.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -102,14 +102,14 @@
 			mainGroup = D4D3F8582FC7FF63005965CA;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A0000000000000000001B0F0 /* XCLocalSwiftPackageReference "lightio-cli" */,
+				A0000000000000000001B0F0 /* XCLocalSwiftPackageReference "cclight-cli" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D4D3F8622FC7FF63005965CA /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D4D3F8602FC7FF63005965CA /* lightio */,
+				D4D3F8602FC7FF63005965CA /* cclight */,
 			);
 		};
 /* End PBXProject section */
@@ -125,7 +125,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		A0000000000000000001B0F3 /* Embed lightio CLI */ = {
+		A0000000000000000001B0F3 /* Embed cclight CLI */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -135,14 +135,14 @@
 			);
 			inputPaths = (
 			);
-			name = "Embed lightio CLI";
+			name = "Embed cclight CLI";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/lightio-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/lightiocli\" \"$DEST/lightio\"\nchmod +x \"$DEST/lightio\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$DEST/lightio\"\nfi\necho \"Embedded lightio CLI → $DEST/lightio\"\n";
+			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/cclight-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/cclightcli\" \"$DEST/cclight\"\nchmod +x \"$DEST/cclight\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$DEST/cclight\"\nfi\necho \"Embedded cclight CLI → $DEST/cclight\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -282,7 +282,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = lightio/lightio.entitlements;
+				CODE_SIGN_ENTITLEMENTS = cclight/cclight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -292,7 +292,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Lightio;
+				INFOPLIST_KEY_CFBundleDisplayName = CCLight;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -300,8 +300,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wangjianshuo.lightio;
-				PRODUCT_NAME = Lightio;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wangjianshuo.cclight;
+				PRODUCT_NAME = CCLight;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -317,7 +317,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = lightio/lightio.entitlements;
+				CODE_SIGN_ENTITLEMENTS = cclight/cclight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -327,7 +327,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Lightio;
+				INFOPLIST_KEY_CFBundleDisplayName = CCLight;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -335,8 +335,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wangjianshuo.lightio;
-				PRODUCT_NAME = Lightio;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wangjianshuo.cclight;
+				PRODUCT_NAME = CCLight;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -359,7 +359,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D4D3F86C2FC7FF65005965CA /* Build configuration list for PBXNativeTarget "lightio" */ = {
+		D4D3F86C2FC7FF65005965CA /* Build configuration list for PBXNativeTarget "cclight" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D4D3F86D2FC7FF65005965CA /* Debug */,
@@ -371,16 +371,16 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		A0000000000000000001B0F0 /* XCLocalSwiftPackageReference "lightio-cli" */ = {
+		A0000000000000000001B0F0 /* XCLocalSwiftPackageReference "cclight-cli" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "lightio-cli";
+			relativePath = "cclight-cli";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A0000000000000000001B0F1 /* LightioCore */ = {
+		A0000000000000000001B0F1 /* CCLightCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = LightioCore;
+			productName = CCLightCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

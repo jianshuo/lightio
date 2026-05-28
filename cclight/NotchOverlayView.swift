@@ -1,7 +1,7 @@
 import AppKit
 import Combine
 import QuartzCore
-import LightioCore
+import CCLightCore
 
 /// Per PROJECT.md: a low-key thin line wrapping the notch with a subtle halo
 /// glow. Extended for multi-session: the U-shape outline is split into N equal
@@ -90,7 +90,7 @@ final class NotchOverlayView: NSView {
     // MARK: - Apply
 
     private func apply(states: [SessionState], animated: Bool) {
-        NSLog("lightio: apply states=\(states.map { $0.rawValue })")
+        NSLog("cclight: apply states=\(states.map { $0.rawValue })")
 
         let effectiveCount = max(states.count, 1)
         ensureSegmentCount(effectiveCount)

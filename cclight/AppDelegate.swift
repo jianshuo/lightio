@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import LightioCore
+import CCLightCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: StateStore!
@@ -14,9 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let screen = NSScreen.main {
             let insets = screen.safeAreaInsets
-            NSLog("lightio: screen frame=\(screen.frame), safeAreaInsets.top=\(insets.top), aux.left=\(String(describing: screen.auxiliaryTopLeftArea)), aux.right=\(String(describing: screen.auxiliaryTopRightArea))")
+            NSLog("cclight: screen frame=\(screen.frame), safeAreaInsets.top=\(insets.top), aux.left=\(String(describing: screen.auxiliaryTopLeftArea)), aux.right=\(String(describing: screen.auxiliaryTopRightArea))")
             if let notchRect = NotchGeometry.notchRect(for: screen) {
-                NSLog("lightio: notchRect=\(notchRect)")
+                NSLog("cclight: notchRect=\(notchRect)")
                 let frame = NotchGeometry.overlayWindowFrame(notchRect: notchRect, glowPadding: 90)
                 overlayWindow = NotchOverlayWindow(contentRect: frame)
                 overlayView = NotchOverlayView(notchSize: notchRect.size)
@@ -24,10 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 overlayWindow.orderFrontRegardless()
                 overlayView.bindSessions(store.$orderedSessionStates)
             } else {
-                NSLog("lightio: no notch detected; overlay disabled")
+                NSLog("cclight: no notch detected; overlay disabled")
             }
         } else {
-            NSLog("lightio: NSScreen.main is nil")
+            NSLog("cclight: NSScreen.main is nil")
         }
 
         menuBar = MenuBarController(store: store)
@@ -50,26 +50,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runFirstRunIfNeeded() {
         NSApp.activate(ignoringOtherApps: true)
         if FirstRun.claudeSettingsExists() {
-            // Check whether lightio hooks are already present. We try the
+            // Check whether cclight hooks are already present. We try the
             // bookmark-based path first; if no bookmark yet we do a best-effort
             // read from the standard location (may be denied in sandbox — in
             // that case we conservatively treat it as not-yet-installed and let
             // the user decide via the offer dialog, which will trigger the open
             // panel and grant access).
-            let alreadyHasLightio: Bool
+            let alreadyHasCCLight: Bool
             if let claudeDirURL = FirstRun.resolveClaudeAccess(),
                claudeDirURL.startAccessingSecurityScopedResource() {
                 defer { claudeDirURL.stopAccessingSecurityScopedResource() }
                 let settingsURL = claudeDirURL.appendingPathComponent("settings.json")
-                alreadyHasLightio = (try? Data(contentsOf: settingsURL))
+                alreadyHasCCLight = (try? Data(contentsOf: settingsURL))
                     .flatMap { String(data: $0, encoding: .utf8) }?
                     .contains(HookInstaller.marker) == true
             } else {
-                alreadyHasLightio = (try? Data(contentsOf: Paths.claudeSettingsFile))
+                alreadyHasCCLight = (try? Data(contentsOf: Paths.claudeSettingsFile))
                     .flatMap { String(data: $0, encoding: .utf8) }?
                     .contains(HookInstaller.marker) == true
             }
-            if !alreadyHasLightio {
+            if !alreadyHasCCLight {
                 FirstRun.offerHooksInstall()
             }
         }
@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if FirstRun.installHooks() {
             let alert = NSAlert()
             alert.messageText = "Hooks installed"
-            alert.informativeText = "Lightio hooks added to ~/.claude/settings.json"
+            alert.informativeText = "CCLight hooks added to ~/.claude/settings.json"
             alert.runModal()
         } else {
             let alert = NSAlert()

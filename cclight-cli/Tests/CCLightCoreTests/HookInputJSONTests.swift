@@ -1,5 +1,5 @@
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class HookInputJSONTests: XCTestCase {
     func testParsesFullPayload() throws {

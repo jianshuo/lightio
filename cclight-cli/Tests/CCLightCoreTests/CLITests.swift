@@ -1,14 +1,14 @@
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
-/// Integration tests that spawn the compiled `lightio` binary.
+/// Integration tests that spawn the compiled `cclight` binary.
 /// They locate the binary via DerivedBuilds in `.build/`.
 final class CLITests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-cli-tests-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-cli-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
@@ -70,7 +70,7 @@ final class CLITests: XCTestCase {
         XCTAssertNotNil(hooks["UserPromptSubmit"])
     }
 
-    func testUninstallHooksRemovesLightioOnly() throws {
+    func testUninstallHooksRemovesCCLightOnly() throws {
         let fakeClaudeDir = tempDir.appendingPathComponent("dot-claude")
         try FileManager.default.createDirectory(at: fakeClaudeDir, withIntermediateDirectories: true)
         _ = try runCLI(args: ["install-hooks"], extraEnv: ["VIBELIGHT_CLAUDE_DIR": fakeClaudeDir.path])
@@ -90,12 +90,12 @@ final class CLITests: XCTestCase {
         let pkgRoot = here.deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let debug = pkgRoot.appendingPathComponent(".build/debug/lightiocli")
+        let debug = pkgRoot.appendingPathComponent(".build/debug/cclightcli")
         if FileManager.default.fileExists(atPath: debug.path) { return debug }
         let arches = (try? FileManager.default.contentsOfDirectory(
             atPath: pkgRoot.appendingPathComponent(".build").path)) ?? []
         for arch in arches where arch.contains("apple-macosx") {
-            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/lightio")
+            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/cclight")
             if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
         }
         return debug

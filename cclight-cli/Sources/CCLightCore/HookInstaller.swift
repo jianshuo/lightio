@@ -2,9 +2,9 @@ import Foundation
 
 public enum HookInstaller {
     /// Marker we embed in each command string so uninstall can find our hooks.
-    public static let marker = "lightio"
+    public static let marker = "cclight"
 
-    /// Hook events lightio installs.
+    /// Hook events cclight installs.
     static let hookEvents: [(event: String, args: String)] = [
         ("SessionStart",     "set waiting"),
         ("UserPromptSubmit", "set working"),
@@ -13,9 +13,9 @@ public enum HookInstaller {
         ("SessionEnd",       "clear"),
     ]
 
-    /// Install lightio hooks into the given settings.json (creating the file
-    /// if missing). Existing non-lightio hooks are preserved. A one-time
-    /// backup is written to `<file>.lightio-backup`.
+    /// Install cclight hooks into the given settings.json (creating the file
+    /// if missing). Existing non-cclight hooks are preserved. A one-time
+    /// backup is written to `<file>.cclight-backup`.
     public static func install(settingsURL: URL, binaryPath: String) throws {
         try writeBackupIfNeeded(settingsURL: settingsURL)
 
@@ -24,7 +24,7 @@ public enum HookInstaller {
 
         for (event, args) in hookEvents {
             var entries = (hooks[event] as? [[String: Any]]) ?? []
-            entries.removeAll { isLightioEntry($0) }
+            entries.removeAll { isCCLightEntry($0) }
             entries.append([
                 "hooks": [[
                     "type": "command",
@@ -38,7 +38,7 @@ public enum HookInstaller {
         try writeSettings(json, to: settingsURL)
     }
 
-    /// Remove lightio hooks. Non-lightio hooks are preserved.
+    /// Remove cclight hooks. Non-cclight hooks are preserved.
     public static func uninstall(settingsURL: URL) throws {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return }
         var json = try readSettings(settingsURL)
@@ -46,7 +46,7 @@ public enum HookInstaller {
 
         for (event, _) in hookEvents {
             guard var entries = hooks[event] as? [[String: Any]] else { continue }
-            entries.removeAll { isLightioEntry($0) }
+            entries.removeAll { isCCLightEntry($0) }
             if entries.isEmpty {
                 hooks.removeValue(forKey: event)
             } else {
@@ -67,7 +67,7 @@ public enum HookInstaller {
         return "/bin/sh -c '[ -x \"\(escaped)\" ] && \"\(escaped)\" \(args); exit 0'"
     }
 
-    private static func isLightioEntry(_ entry: [String: Any]) -> Bool {
+    private static func isCCLightEntry(_ entry: [String: Any]) -> Bool {
         guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
         return inner.contains { ($0["command"] as? String)?.contains(marker) == true }
     }
@@ -94,7 +94,7 @@ public enum HookInstaller {
     }
 
     private static func writeBackupIfNeeded(settingsURL: URL) throws {
-        let backup = settingsURL.appendingPathExtension("lightio-backup")
+        let backup = settingsURL.appendingPathExtension("cclight-backup")
         guard FileManager.default.fileExists(atPath: settingsURL.path),
               !FileManager.default.fileExists(atPath: backup.path)
         else { return }

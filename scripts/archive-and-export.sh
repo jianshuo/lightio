@@ -1,6 +1,6 @@
 #!/bin/bash
-# Archive Lightio for App Store distribution.
-# Prereq: an app record for bundle id com.wangjianshuo.lightio must exist
+# Archive CCLight for App Store distribution.
+# Prereq: an app record for bundle id com.wangjianshuo.cclight must exist
 # in App Store Connect (https://appstoreconnect.apple.com/apps) and the team's
 # Apple Distribution cert + provisioning profile must be available.
 #
@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ARCHIVE="$ROOT/build/Lightio.xcarchive"
+ARCHIVE="$ROOT/build/CCLight.xcarchive"
 EXPORT_DIR="$ROOT/build/export"
 EXPORT_OPTS="$ROOT/scripts/ExportOptions.plist"
 
@@ -21,8 +21,8 @@ rm -rf "$ARCHIVE" "$EXPORT_DIR"
 
 echo "==> Archive"
 xcodebuild \
-  -project lightio.xcodeproj \
-  -scheme lightio \
+  -project cclight.xcodeproj \
+  -scheme cclight \
   -configuration Release \
   -destination 'platform=macOS' \
   archive \

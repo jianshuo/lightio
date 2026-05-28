@@ -1,12 +1,12 @@
 import XCTest
-@testable import LightioCore
+@testable import CCLightCore
 
 final class StateFileTests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("lightio-tests-\(UUID().uuidString)")
+            .appendingPathComponent("cclight-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
     }

@@ -1,4 +1,4 @@
-# Lightio — Design Spec
+# CCLight — Design Spec
 
 Date: 2026-05-28
 Author: Jianshuo Wang (brainstormed with Claude)
@@ -112,17 +112,17 @@ Four components, all in one `.app` bundle:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ lightio.app  (LSUIElement = true, no Dock icon)           │
+│ cclight.app  (LSUIElement = true, no Dock icon)           │
 │                                                             │
 │  ┌──────────────┐    FSEvents    ┌────────────────────┐    │
-│  │  StateStore  │ ◄────────────  │ ~/.lightio/      │    │
+│  │  StateStore  │ ◄────────────  │ ~/.cclight/      │    │
 │  │              │                │   state.json       │    │
 │  │ - debounce   │                └────────────────────┘    │
 │  │ - merge      │                          ▲                │
 │  │   sessions   │                          │ atomic write   │
 │  │ - 5min timer │                          │                │
 │  └──────┬───────┘                ┌─────────┴────────┐       │
-│         │ publishes              │  lightio CLI    │       │
+│         │ publishes              │  cclight CLI    │       │
 │         │ CurrentState           │  (bundled binary, │       │
 │         ▼                        │   symlinked to    │       │
 │  ┌──────────────┐                │   /usr/local/bin) │       │
@@ -142,28 +142,28 @@ Four components, all in one `.app` bundle:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Component: CLI (`lightio`)
+### Component: CLI (`cclight`)
 
-Swift binary, ~50KB. Bundled inside `lightio.app/Contents/Resources/lightio`.
-On first launch the app installs a symlink to `/usr/local/bin/lightio`
+Swift binary, ~50KB. Bundled inside `cclight.app/Contents/Resources/cclight`.
+On first launch the app installs a symlink to `/usr/local/bin/cclight`
 (requires admin password once, via `STPrivilegedTask` or `osascript`).
 
 Commands:
 
 | Command                          | Effect                                                                       |
 |----------------------------------|------------------------------------------------------------------------------|
-| `lightio set <working|waiting>`| Reads Claude Code's hook-input JSON on stdin, extracts `session_id` + `cwd`, atomic-writes that session's entry into state.json. Falls back to session id `"default"` if stdin is empty (for dev testing). |
-| `lightio clear`                | Same input handling; removes the session entry                               |
-| `lightio status`               | Print current state.json (debug, ignores stdin)                              |
-| `lightio install-hooks`        | Patch `~/.claude/settings.json` to add hooks                                 |
-| `lightio uninstall-hooks`      | Remove lightio hooks from settings.json                                    |
+| `cclight set <working|waiting>`| Reads Claude Code's hook-input JSON on stdin, extracts `session_id` + `cwd`, atomic-writes that session's entry into state.json. Falls back to session id `"default"` if stdin is empty (for dev testing). |
+| `cclight clear`                | Same input handling; removes the session entry                               |
+| `cclight status`               | Print current state.json (debug, ignores stdin)                              |
+| `cclight install-hooks`        | Patch `~/.claude/settings.json` to add hooks                                 |
+| `cclight uninstall-hooks`      | Remove cclight hooks from settings.json                                    |
 
 Atomic write: write to `state.json.tmp.<pid>` then `rename(2)` over `state.json`.
 This guarantees the FSEventStream consumer never sees a half-written file.
 
 ### Component: StateStore
 
-Singleton inside the app. Watches `~/.lightio/state.json` via
+Singleton inside the app. Watches `~/.cclight/state.json` via
 `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents`. On every
 change:
 
@@ -196,7 +196,7 @@ filled circle matching the current state color.
 Menu:
 
 ```
-● lightio                                  ← colored dot matching state
+● cclight                                  ← colored dot matching state
 ─────────────────
 当前状态: WORKING (1 个 session)
 ─────────────────
@@ -205,13 +205,13 @@ Uninstall Claude Code Hooks
 ─────────────────
 Launch at Login                            ✓
 ─────────────────
-About lightio
+About cclight
 Quit
 ```
 
 ## 5. Data formats
 
-### `~/.lightio/state.json`
+### `~/.cclight/state.json`
 
 ```json
 {
@@ -220,7 +220,7 @@ Quit
     "abc123-session-uuid": {
       "state": "working",
       "ts": 1779944100,
-      "cwd": "/Users/jianshuo/code/lightio"
+      "cwd": "/Users/jianshuo/code/cclight"
     },
     "def456-session-uuid": {
       "state": "waiting",
@@ -243,40 +243,40 @@ Quit
 {
   "hooks": {
     "SessionStart": [
-      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
+      {"hooks": [{"type": "command", "command": "cclight set waiting"}]}
     ],
     "UserPromptSubmit": [
-      {"hooks": [{"type": "command", "command": "lightio set working"}]}
+      {"hooks": [{"type": "command", "command": "cclight set working"}]}
     ],
     "Stop": [
-      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
+      {"hooks": [{"type": "command", "command": "cclight set waiting"}]}
     ],
     "Notification": [
-      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
+      {"hooks": [{"type": "command", "command": "cclight set waiting"}]}
     ],
     "SessionEnd": [
-      {"hooks": [{"type": "command", "command": "lightio clear"}]}
+      {"hooks": [{"type": "command", "command": "cclight clear"}]}
     ]
   }
 }
 ```
 
 Claude Code pipes a JSON payload to each hook's stdin containing
-`session_id`, `cwd`, `hook_event_name` etc. The `lightio` CLI reads that
+`session_id`, `cwd`, `hook_event_name` etc. The `cclight` CLI reads that
 JSON to identify the session.
 
 The installer merges with existing hooks (does not clobber). Original
-settings.json is backed up to `settings.json.lightio-backup` once.
+settings.json is backed up to `settings.json.cclight-backup` once.
 
 ## 6. First-run UX
 
-1. User drags `lightio.app` from `.dmg` into `/Applications`, double-clicks.
-2. App checks `/usr/local/bin/lightio`:
-   - Missing → dialog: "需要把 CLI 安装到 `/usr/local/bin/lightio`，
+1. User drags `cclight.app` from `.dmg` into `/Applications`, double-clicks.
+2. App checks `/usr/local/bin/cclight`:
+   - Missing → dialog: "需要把 CLI 安装到 `/usr/local/bin/cclight`，
      这一步需要管理员密码。" → user approves → admin-elevated `ln -s`.
 3. App checks `~/.claude/settings.json`:
-   - Exists → dialog: "检测到 Claude Code，是否自动加入 lightio 的 hooks？
-     原文件会备份到 `settings.json.lightio-backup`。" → user approves →
+   - Exists → dialog: "检测到 Claude Code，是否自动加入 cclight 的 hooks？
+     原文件会备份到 `settings.json.cclight-backup`。" → user approves →
      CLI's `install-hooks` runs.
    - Missing → dialog skipped; "Install Hooks" menu item remains for later.
 4. `SMAppService.mainApp.register()` to enable Launch at Login.
@@ -285,11 +285,11 @@ settings.json is backed up to `settings.json.lightio-backup` once.
 ## 7. Build & ship (V1)
 
 - **Target**: macOS 14+ (Sonoma) — needed for safe-area APIs.
-- **Project**: existing `lightio.xcodeproj` (SwiftUI scaffold — to be
+- **Project**: existing `cclight.xcodeproj` (SwiftUI scaffold — to be
   largely replaced; only `App` entry point is reused).
 - **Distribution**: signed `.dmg` from local Developer ID (not App Store).
 - **No sandbox** in V1 (needed for the `/usr/local/bin` symlink).
-- **Min build**: `xcodebuild -scheme lightio build`. Manual smoke test on
+- **Min build**: `xcodebuild -scheme cclight build`. Manual smoke test on
   the dev machine.
 
 ## 8. Out of scope for V1
@@ -322,7 +322,7 @@ settings.json is backed up to `settings.json.lightio-backup` once.
    `auxiliaryTopRightArea`.
 2. **Symlink + sudo**: requesting admin password on first launch is a UX
    hit. Alternative: drop the symlink and have the hook config use the
-   full path `/Applications/lightio.app/Contents/Resources/lightio`.
+   full path `/Applications/cclight.app/Contents/Resources/cclight`.
    Cleaner but more brittle if user renames the app. Default to symlink,
    but expose this in install-hooks via a `--no-symlink` flag.
 3. **FSEvents latency**: typically <100ms but can spike. Acceptable for
