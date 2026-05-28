@@ -46,7 +46,7 @@ func run(_ args: [String]) -> Int32 {
             return 0
 
         case "install-hooks":
-            let binaryPath = "/usr/local/bin/vibelight"
+            let binaryPath = "/Applications/VibeLight.app/Contents/Resources/vibelight"
             try HookInstaller.install(settingsURL: Paths.claudeSettingsFile, binaryPath: binaryPath)
             FileHandle.standardOutput.write(Data("Installed vibelight hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
             return 0

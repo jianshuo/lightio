@@ -49,23 +49,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func runFirstRunIfNeeded() {
         NSApp.activate(ignoringOtherApps: true)
-        if !FirstRun.isSymlinkInstalled() {
-            let alert = NSAlert()
-            alert.messageText = "Install Vibe Light CLI?"
-            alert.informativeText = """
-            需要把 CLI 安装到 /usr/local/bin/vibelight，
-            这一步需要管理员密码（一次性）。
-            """
-            alert.addButton(withTitle: "Install")
-            alert.addButton(withTitle: "Later")
-            if alert.runModal() == .alertFirstButtonReturn {
-                FirstRun.installSymlinkInteractively()
-            }
-        }
         if FirstRun.claudeSettingsExists() {
-            let alreadyHasVibelight = (try? Data(contentsOf: Paths.claudeSettingsFile))
-                .flatMap { String(data: $0, encoding: .utf8) }?
-                .contains(HookInstaller.marker) == true
+            // Check whether vibelight hooks are already present. We try the
+            // bookmark-based path first; if no bookmark yet we do a best-effort
+            // read from the standard location (may be denied in sandbox — in
+            // that case we conservatively treat it as not-yet-installed and let
+            // the user decide via the offer dialog, which will trigger the open
+            // panel and grant access).
+            let alreadyHasVibelight: Bool
+            if let claudeDirURL = FirstRun.resolveClaudeAccess(),
+               claudeDirURL.startAccessingSecurityScopedResource() {
+                defer { claudeDirURL.stopAccessingSecurityScopedResource() }
+                let settingsURL = claudeDirURL.appendingPathComponent("settings.json")
+                alreadyHasVibelight = (try? Data(contentsOf: settingsURL))
+                    .flatMap { String(data: $0, encoding: .utf8) }?
+                    .contains(HookInstaller.marker) == true
+            } else {
+                alreadyHasVibelight = (try? Data(contentsOf: Paths.claudeSettingsFile))
+                    .flatMap { String(data: $0, encoding: .utf8) }?
+                    .contains(HookInstaller.marker) == true
+            }
             if !alreadyHasVibelight {
                 FirstRun.offerHooksInstall()
             }

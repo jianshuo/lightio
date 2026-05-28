@@ -5,49 +5,65 @@ import VibelightCore
 /// Handles one-time install steps on first launch and exposes "Install Hooks"
 /// as a re-runnable action.
 enum FirstRun {
-    static let symlinkPath = "/usr/local/bin/vibelight"
 
-    /// Path to the CLI bundled inside this .app.
-    static var bundledCLIPath: String {
-        Bundle.main.resourcePath.map { "\($0)/vibelight" }
-            ?? "/Applications/VibeLight.app/Contents/Resources/vibelight"
+    // MARK: - Security-scoped bookmark for ~/.claude
+
+    /// UserDefaults key for the persisted security-scoped bookmark covering
+    /// the user's ~/.claude directory.
+    private static let bookmarkKey = "ClaudeSettingsBookmark"
+
+    /// Show an open panel scoped to ~/.claude so the user grants access. The
+    /// returned URL is security-scoped — caller must call
+    /// `startAccessingSecurityScopedResource` before reading/writing, and
+    /// `stopAccessingSecurityScopedResource` after.
+    static func promptForClaudeAccess() -> URL? {
+        let panel = NSOpenPanel()
+        panel.message = "Vibe Light needs one-time access to your ~/.claude folder to install the Claude Code hooks."
+        panel.prompt = "Grant Access"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        let claudeDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude", isDirectory: true)
+        panel.directoryURL = claudeDir
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        // Save bookmark for reuse across launches.
+        if let data = try? url.bookmarkData(options: .withSecurityScope,
+                                             includingResourceValuesForKeys: nil,
+                                             relativeTo: nil) {
+            UserDefaults.standard.set(data, forKey: bookmarkKey)
+        }
+        return url
     }
 
-    // MARK: - Symlink
-
-    static func isSymlinkInstalled() -> Bool {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: symlinkPath) else { return false }
-        // Verify it's a symlink pointing to *our* bundled CLI
-        let attrs = try? fm.attributesOfItem(atPath: symlinkPath)
-        if attrs?[.type] as? FileAttributeType == .typeSymbolicLink {
-            let dest = try? fm.destinationOfSymbolicLink(atPath: symlinkPath)
-            return dest == bundledCLIPath
-        }
-        return false
-    }
-
-    /// Asks for admin password and creates the symlink. Returns true on success.
-    @discardableResult
-    static func installSymlinkInteractively() -> Bool {
-        let escaped = bundledCLIPath.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = """
-        do shell script "mkdir -p /usr/local/bin && ln -sf \\"\(escaped)\\" /usr/local/bin/vibelight" with administrator privileges
-        """
-        var errorInfo: NSDictionary?
-        let runner = NSAppleScript(source: script)
-        _ = runner?.executeAndReturnError(&errorInfo)
-        if let error = errorInfo {
-            NSLog("vibelight symlink install failed: \(error)")
-            return false
-        }
-        return isSymlinkInstalled()
+    /// Resolve the saved bookmark to a URL the app can read/write. Returns nil
+    /// if the bookmark is missing or stale.
+    static func resolveClaudeAccess() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data,
+                                  options: .withSecurityScope,
+                                  relativeTo: nil,
+                                  bookmarkDataIsStale: &stale) else { return nil }
+        if stale { return nil }
+        return url
     }
 
     // MARK: - Hooks dialog
 
+    /// Best-effort check: try the bookmark first; if unavailable fall back to a
+    /// direct stat (which the sandbox may deny, giving false-negative, so we
+    /// return false conservatively).
     static func claudeSettingsExists() -> Bool {
-        FileManager.default.fileExists(atPath: Paths.claudeSettingsFile.path)
+        if let claudeDirURL = resolveClaudeAccess() {
+            guard claudeDirURL.startAccessingSecurityScopedResource() else {
+                return FileManager.default.fileExists(atPath: Paths.claudeSettingsFile.path)
+            }
+            defer { claudeDirURL.stopAccessingSecurityScopedResource() }
+            let settingsURL = claudeDirURL.appendingPathComponent("settings.json")
+            return FileManager.default.fileExists(atPath: settingsURL.path)
+        }
+        return FileManager.default.fileExists(atPath: Paths.claudeSettingsFile.path)
     }
 
     /// Shows a modal dialog asking the user to install hooks. Returns whether
@@ -69,13 +85,25 @@ enum FirstRun {
         return installHooks()
     }
 
-    /// Patch ~/.claude/settings.json. Returns success.
+    /// Patch ~/.claude/settings.json via a security-scoped bookmark. Shows the
+    /// open panel on first call so the user grants access. Returns success.
     @discardableResult
     static func installHooks() -> Bool {
+        let claudeDirURL: URL
+        if let cached = resolveClaudeAccess() {
+            claudeDirURL = cached
+        } else if let granted = promptForClaudeAccess() {
+            claudeDirURL = granted
+        } else {
+            return false
+        }
+        guard claudeDirURL.startAccessingSecurityScopedResource() else { return false }
+        defer { claudeDirURL.stopAccessingSecurityScopedResource() }
+        let settingsURL = claudeDirURL.appendingPathComponent("settings.json")
         do {
             try HookInstaller.install(
-                settingsURL: Paths.claudeSettingsFile,
-                binaryPath: symlinkPath
+                settingsURL: settingsURL,
+                binaryPath: "/Applications/VibeLight.app/Contents/Resources/vibelight"
             )
             return true
         } catch {
@@ -86,8 +114,12 @@ enum FirstRun {
 
     @discardableResult
     static func uninstallHooks() -> Bool {
+        guard let claudeDirURL = resolveClaudeAccess() else { return false }
+        guard claudeDirURL.startAccessingSecurityScopedResource() else { return false }
+        defer { claudeDirURL.stopAccessingSecurityScopedResource() }
+        let settingsURL = claudeDirURL.appendingPathComponent("settings.json")
         do {
-            try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
+            try HookInstaller.uninstall(settingsURL: settingsURL)
             return true
         } catch {
             NSLog("vibelight uninstallHooks failed: \(error)")
