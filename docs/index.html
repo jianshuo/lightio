@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CCLight — Your MacBook notch tells you when Claude is thinking</title>
+  <meta name="description" content="CCLight paints Claude Code's state onto your MacBook notch. No windows, no notifications — just light." />
+  <meta name="theme-color" content="#0a0a0b" />
+
+  <meta property="og:title" content="CCLight" />
+  <meta property="og:description" content="Your MacBook notch tells you when Claude is thinking. No windows, no notifications — just light." />
+  <meta property="og:image" content="https://jianshuo.github.io/cclight/og.png" />
+  <meta property="og:url" content="https://jianshuo.github.io/cclight/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+
+  <script>document.documentElement.classList.add('js');</script>
+
+  <style>
+    /* ─────────────────────────────────────────────
+       tokens
+    ────────────────────────────────────────────── */
+    :root {
+      --bg:           #0a0a0b;
+      --bg-tint:      #101012;
+      --surface:      #141416;
+      --hairline:     #1f1f22;
+      --hairline-2:   #2a2a2e;
+      --ink:          #f5f5f4;
+      --ink-2:        #b9b9b3;
+      --ink-3:        #76766f;
+      --ink-4:        #44443f;
+
+      --amber:        #ffb000;
+      --green:        #5fcf7a;
+      --white:        #ffffff;
+
+      --state:        var(--amber);
+      --state-soft:   rgba(255, 176, 0, 0.18);
+      --state-label:  "Working";
+
+      --serif: "Instrument Serif", "Iowan Old Style", "Apple Garamond", Georgia, serif;
+      --mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+      --max:   1240px;
+      --gutter: 6vw;
+    }
+
+    /* ─────────────────────────────────────────────
+       reset & base
+    ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.6;
+      letter-spacing: 0.01em;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* subtle grain on the dark background so it doesn't look flat */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0.035;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    img { display: block; max-width: 100%; }
+
+    /* ─────────────────────────────────────────────
+       layout primitives
+    ────────────────────────────────────────────── */
+    .wrap {
+      max-width: var(--max);
+      margin-inline: auto;
+      padding-inline: var(--gutter);
+    }
+
+    .rule {
+      height: 1px;
+      background: var(--hairline);
+      margin: 0;
+      border: 0;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 36px;
+    }
+    .section-label .num {
+      color: var(--ink-4);
+      font-variant-numeric: tabular-nums;
+    }
+    .section-label .bar {
+      flex: 1;
+      height: 1px;
+      background: var(--hairline);
+      transform: translateY(-3px);
+    }
+
+    /* ─────────────────────────────────────────────
+       nav
+    ────────────────────────────────────────────── */
+    nav.top {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      background: rgba(10, 10, 11, 0.6);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    nav.top.scrolled { border-bottom-color: var(--hairline); }
+    nav.top .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-block: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+    }
+    .brand-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--state);
+      box-shadow: 0 0 8px var(--state), 0 0 16px var(--state-soft);
+      animation: brandPulse 3.2s ease-in-out infinite;
+    }
+    @keyframes brandPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+    nav.top .links {
+      display: flex; gap: 28px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    nav.top .links a {
+      position: relative;
+      transition: color 0.2s;
+    }
+    nav.top .links a:hover { color: var(--ink); }
+    nav.top .links a.cta {
+      color: var(--amber);
+    }
+    nav.top .links a.cta::after {
+      content: "↓";
+      margin-left: 6px;
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    nav.top .links a.cta:hover::after { transform: translateY(2px); }
+
+    /* ─────────────────────────────────────────────
+       hero
+    ────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      padding-top: 96px;
+      padding-bottom: 120px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    /* soft ambient halo behind the notch — colored by current state */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -120px; left: 50%;
+      width: 1200px; height: 600px;
+      transform: translateX(-50%);
+      background: radial-gradient(50% 60% at 50% 50%, var(--state-soft), transparent 70%);
+      filter: blur(40px);
+      opacity: 0.9;
+      z-index: -1;
+      transition: background 1.2s ease;
+      pointer-events: none;
+    }
+
+    /* the simulated MacBook lid top — a subtle horizontal bezel hint */
+    .lid {
+      position: relative;
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto 64px;
+      height: 110px;
+      display: flex;
+      justify-content: center;
+    }
+    .lid::before, .lid::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--hairline-2) 30%, var(--hairline-2) 70%, transparent);
+    }
+    .lid::before { left: 0; right: 0; }
+    .lid::after  { left: 5%; right: 5%; top: 1px; opacity: 0.4; }
+
+    /* the notch widget itself */
+    .notch {
+      position: relative;
+      width: 380px;
+      height: 100px;
+      display: flex;
+      justify-content: center;
+    }
+    .notch svg {
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      overflow: visible;
+    }
+    .notch .core,
+    .notch .glow {
+      fill: none;
+      stroke: var(--state);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 0.8s ease;
+    }
+    .notch .core      { stroke-width: 1.6; }
+    .notch .g1        { stroke-width: 3;  opacity: 0.55; filter: blur(3px); }
+    .notch .g2        { stroke-width: 6;  opacity: 0.4;  filter: blur(7px); }
+    .notch .g3        { stroke-width: 10; opacity: 0.3;  filter: blur(14px); }
+    .notch .g4        { stroke-width: 16; opacity: 0.22; filter: blur(28px); }
+    .notch .g5        { stroke-width: 24; opacity: 0.14; filter: blur(50px); }
+    .notch .body      { fill: #000; }
+
+    /* hero copy */
+    .hero-copy {
+      text-align: center;
+      max-width: 920px;
+      margin: 0 auto;
+      padding-inline: var(--gutter);
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      padding: 7px 14px;
+      border: 1px solid var(--hairline);
+      border-radius: 100px;
+      margin-bottom: 36px;
+      transition: border-color 0.8s ease, color 0.8s ease;
+    }
+    .eyebrow .state-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--state);
+      box-shadow: 0 0 6px var(--state);
+      transition: background 0.8s ease, box-shadow 0.8s ease;
+    }
+    .eyebrow .state-label {
+      color: var(--state);
+      font-weight: 500;
+      transition: color 0.8s ease;
+    }
+
+    h1.headline {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(40px, 7vw, 92px);
+      line-height: 1.02;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin: 0 0 28px;
+    }
+    h1.headline em {
+      font-style: italic;
+      color: var(--state);
+      transition: color 0.8s ease;
+    }
+
+    .sub {
+      font-family: var(--mono);
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--ink-2);
+      max-width: 540px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .btn {
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      padding: 14px 22px;
+      border-radius: 100px;
+      border: 1px solid var(--hairline-2);
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: transform 0.15s ease, background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--ink-3); }
+    .btn .arrow {
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .btn:hover .arrow { transform: translate(2px, -2px); }
+    .btn.primary {
+      background: var(--amber);
+      color: #1a0f00;
+      border-color: var(--amber);
+      box-shadow: 0 0 0 0 var(--state-soft), 0 10px 30px -10px rgba(255, 176, 0, 0.5);
+    }
+    .btn.primary:hover {
+      background: #ffc233;
+      border-color: #ffc233;
+    }
+
+    .hero-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .hero-meta .sep { color: var(--ink-4); }
+
+    /* ─────────────────────────────────────────────
+       states section
+    ────────────────────────────────────────────── */
+    section.states {
+      padding-block: 120px;
+      border-top: 1px solid var(--hairline);
+    }
+    .states-intro {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: end;
+      margin-bottom: 80px;
+    }
+    .states-intro h2 {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.08;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+    .states-intro h2 em { font-style: italic; }
+    .states-intro p {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--ink-2);
+      max-width: 380px;
+      margin: 0;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border: 1px solid var(--hairline);
+      border-radius: 0;
+    }
+    .state-card {
+      padding: 44px 36px 38px;
+      border-right: 1px solid var(--hairline);
+      cursor: pointer;
+      position: relative;
+      transition: background 0.3s;
+    }
+    .state-card:last-child { border-right: none; }
+    .state-card:hover { background: var(--bg-tint); }
+
+    .state-card[data-active="true"] {
+      background: var(--bg-tint);
+    }
+    .state-card[data-active="true"]::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: var(--card-color);
+      box-shadow: 0 0 12px var(--card-color);
+    }
+
+    .state-card .swatch {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--card-color);
+      box-shadow: 0 0 16px var(--card-color);
+      margin-bottom: 28px;
+    }
+    .state-card h3 {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 36px;
+      margin: 0 0 14px;
+      letter-spacing: -0.01em;
+      color: var(--card-color);
+    }
+    .state-card .hex {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: var(--ink-3);
+      margin-bottom: 24px;
+      display: block;
+    }
+    .state-card p {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--ink-2);
+      margin: 0;
+    }
+    .state-card .micro {
+      font-size: 11px;
+      color: var(--ink-3);
+      margin-top: 18px;
+      letter-spacing: 0.04em;
+    }
+
+    /* state card themed accent vars */
+    .state-card.working { --card-color: var(--amber); }
+    .state-card.waiting { --card-color: var(--green); }
+    .state-card.idle    { --card-color: var(--white); }
+
+    .hover-hint {
+      margin-top: 22px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+      text-align: center;
+    }
+
+    /* ─────────────────────────────────────────────
+       multi-session
+    ────────────────────────────────────────────── */
+    section.multi {
+      padding-block: 120px;
+      border-top: 1px solid var(--hairline);
+      background: linear-gradient(180deg, var(--bg) 0%, #08080a 100%);
+    }
+    .multi-head {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 80px;
+      align-items: start;
+      margin-bottom: 72px;
+    }
+    .multi-head h2 {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.08;
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+    .multi-head h2 em { font-style: italic; color: var(--green); }
+    .multi-head p {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--ink-2);
+      margin: 0;
+    }
+
+    .multi-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 36px;
+      padding: 64px 32px 48px;
+      border: 1px solid var(--hairline);
+      background: rgba(10, 10, 11, 0.5);
+    }
+    .multi-stage .lid-mini {
+      width: 100%;
+      max-width: 720px;
+      height: 92px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      border-top: 1px solid var(--hairline-2);
+      padding-top: 0;
+    }
+    .multi-toggle {
+      display: inline-flex;
+      gap: 0;
+      border: 1px solid var(--hairline);
+      border-radius: 100px;
+      padding: 4px;
+    }
+    .multi-toggle button {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      padding: 8px 18px;
+      border-radius: 100px;
+      color: var(--ink-3);
+      transition: background 0.2s, color 0.2s;
+    }
+    .multi-toggle button.active {
+      background: var(--ink);
+      color: var(--bg);
+    }
+    .multi-toggle button:hover:not(.active) {
+      color: var(--ink);
+    }
+    .multi-stage .caption {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .multi-stage .caption strong {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    /* ─────────────────────────────────────────────
+       why / quotes
+    ────────────────────────────────────────────── */
+    section.why {
+      padding-block: 140px;
+      border-top: 1px solid var(--hairline);
+    }
+    .why-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 100px;
+      align-items: start;
+    }
+    .why-grid .left h2 {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(40px, 5vw, 64px);
+      line-height: 1.02;
+      margin: 0 0 24px;
+      letter-spacing: -0.02em;
+    }
+    .why-grid .left h2 em { font-style: italic; color: var(--amber); }
+    .why-grid .left .kicker {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 28px;
+    }
+    .why-grid .right {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+    .why-grid .right p {
+      font-family: var(--serif);
+      font-size: clamp(20px, 2.3vw, 28px);
+      line-height: 1.4;
+      color: var(--ink);
+      margin: 0;
+      letter-spacing: -0.005em;
+    }
+    .why-grid .right p:nth-child(2) { color: var(--ink-2); font-size: clamp(18px, 1.9vw, 22px); }
+    .why-grid .right p:nth-child(3) { color: var(--ink-3); font-size: clamp(16px, 1.6vw, 18px); }
+    .why-grid .right p em { font-style: italic; }
+
+    /* ─────────────────────────────────────────────
+       specs / tech
+    ────────────────────────────────────────────── */
+    section.specs {
+      padding-block: 120px;
+      border-top: 1px solid var(--hairline);
+      background: #070708;
+    }
+    .specs h2 {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(28px, 3.4vw, 44px);
+      line-height: 1.08;
+      letter-spacing: -0.015em;
+      margin: 0 0 64px;
+      max-width: 640px;
+    }
+    .specs h2 em { font-style: italic; }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--hairline);
+      border-left: 1px solid var(--hairline);
+    }
+    .spec {
+      padding: 32px 28px;
+      border-right: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .spec .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 14px;
+    }
+    .spec .value {
+      font-family: var(--serif);
+      font-size: 26px;
+      line-height: 1.2;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+    .spec .value .unit {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-left: 4px;
+      letter-spacing: 0.08em;
+    }
+    .spec .note {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-3);
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    .hooks-block {
+      margin-top: 64px;
+      padding: 32px;
+      border: 1px solid var(--hairline);
+      background: rgba(20, 20, 22, 0.4);
+      border-radius: 0;
+    }
+    .hooks-block .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 20px;
+    }
+    .hooks-table {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-2);
+    }
+    .hooks-table > div {
+      padding: 12px 0;
+      border-top: 1px dashed var(--hairline-2);
+    }
+    .hooks-table > div:first-child,
+    .hooks-table > div:nth-child(2) { border-top: none; }
+    .hooks-table .hook {
+      color: var(--ink);
+    }
+    .hooks-table .cmd {
+      color: var(--green);
+    }
+
+    /* ─────────────────────────────────────────────
+       cta / install
+    ────────────────────────────────────────────── */
+    section.cta {
+      padding-block: 160px;
+      border-top: 1px solid var(--hairline);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    section.cta::before {
+      content: "";
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 1400px; height: 800px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(50% 50% at 50% 50%, rgba(255, 176, 0, 0.12), transparent 70%);
+      filter: blur(60px);
+      z-index: -1;
+    }
+    section.cta h2 {
+      font-family: var(--serif);
+      font-weight: 400;
+      font-size: clamp(40px, 6vw, 80px);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin: 0 0 32px;
+      max-width: 800px;
+      margin-inline: auto;
+    }
+    section.cta h2 em { font-style: italic; color: var(--amber); }
+    section.cta p {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--ink-2);
+      max-width: 480px;
+      margin: 0 auto 48px;
+      line-height: 1.65;
+    }
+    section.cta .terminal {
+      max-width: 540px;
+      margin: 56px auto 0;
+      text-align: left;
+      border: 1px solid var(--hairline);
+      background: rgba(0, 0, 0, 0.5);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-2);
+    }
+    section.cta .terminal .head {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--hairline);
+      display: flex; align-items: center; gap: 8px;
+      color: var(--ink-3);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    section.cta .terminal .head .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--hairline-2);
+    }
+    section.cta .terminal pre {
+      margin: 0;
+      padding: 18px 18px;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    section.cta .terminal .prompt { color: var(--green); }
+    section.cta .terminal .comment { color: var(--ink-3); }
+
+    /* ─────────────────────────────────────────────
+       footer
+    ────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--hairline);
+      padding-block: 56px;
+      background: #050506;
+    }
+    footer .wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 48px;
+      flex-wrap: wrap;
+    }
+    footer .col {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+      line-height: 1.8;
+    }
+    footer .col strong {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    footer .col a:hover { color: var(--ink); }
+    footer .made {
+      max-width: 320px;
+      color: var(--ink-3);
+    }
+    footer .made em { font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 14px; }
+
+    /* ─────────────────────────────────────────────
+       reveal on scroll — scoped to .js so no-JS falls back visible
+    ────────────────────────────────────────────── */
+    .js .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .js .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal[data-delay="1"] { transition-delay: 0.08s; }
+    .reveal[data-delay="2"] { transition-delay: 0.16s; }
+    .reveal[data-delay="3"] { transition-delay: 0.24s; }
+    .reveal[data-delay="4"] { transition-delay: 0.32s; }
+
+    /* hero reveal sequence — fires on load */
+    .hero .lid          { opacity: 0; animation: rise 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s forwards; }
+    .hero .eyebrow      { opacity: 0; animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s forwards; }
+    .hero .headline     { opacity: 0; animation: rise 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.65s forwards; }
+    .hero .sub          { opacity: 0; animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.85s forwards; }
+    .hero .hero-ctas    { opacity: 0; animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 1.0s forwards; }
+    .hero .hero-meta    { opacity: 0; animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 1.15s forwards; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─────────────────────────────────────────────
+       responsive
+    ────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      :root { --gutter: 24px; }
+      .states-intro,
+      .multi-head,
+      .why-grid { grid-template-columns: 1fr; gap: 32px; }
+      .state-grid { grid-template-columns: 1fr; }
+      .state-card { border-right: none; border-bottom: 1px solid var(--hairline); }
+      .state-card:last-child { border-bottom: none; }
+      .spec-grid { grid-template-columns: repeat(2, 1fr); }
+      .hooks-table { grid-template-columns: 140px 1fr; font-size: 12px; }
+      nav.top .links a:not(.cta) { display: none; }
+      .hero { padding-top: 64px; padding-bottom: 72px; }
+      section.states, section.multi, section.specs { padding-block: 80px; }
+      section.cta { padding-block: 96px; }
+      .notch { width: 280px; }
+      .multi-stage { padding: 36px 16px 32px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="top" id="topnav">
+    <div class="wrap">
+      <a href="/cclight/" class="brand" aria-label="CCLight">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span>CCLIGHT</span>
+      </a>
+      <div class="links">
+        <a href="#states">States</a>
+        <a href="#multi">Multi-session</a>
+        <a href="#tech">Tech</a>
+        <a href="https://github.com/jianshuo/cclight" target="_blank" rel="noopener">GitHub</a>
+        <a class="cta" href="https://github.com/jianshuo/cclight/releases/latest/download/CCLight.dmg">Download</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─────────────── HERO ─────────────── -->
+  <header class="hero">
+    <div class="lid">
+      <div class="notch" id="hero-notch">
+        <!-- viewBox 380x100; notch body roughly 320x40 with rounded bottom corners; U-light wraps the bottom -->
+        <svg viewBox="-10 -10 400 110" width="400" height="110" aria-hidden="true">
+          <!-- the black notch shape -->
+          <path class="body" d="M 30 -10 L 350 -10 L 350 26 Q 350 40 336 40 L 44 40 Q 30 40 30 26 Z" />
+          <!-- U-shaped light path: outside the notch, opens upward -->
+          <g>
+            <path class="glow g5" d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+            <path class="glow g4" d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+            <path class="glow g3" d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+            <path class="glow g2" d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+            <path class="glow g1" d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+            <path class="core"    d="M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10" />
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="hero-copy">
+      <span class="eyebrow">
+        <span class="state-dot" aria-hidden="true"></span>
+        <span>State</span>
+        <span class="state-label" id="hero-state-label">Working</span>
+      </span>
+
+      <h1 class="headline">
+        Your MacBook notch<br />
+        tells you when Claude<br />
+        is <em>thinking</em>.
+      </h1>
+
+      <p class="sub">
+        No windows. No notifications. No bouncing dock icons. Just a thin line of light around your notch, in three colors, in your peripheral vision.
+      </p>
+
+      <div class="hero-ctas">
+        <a class="btn primary" href="https://github.com/jianshuo/cclight/releases/latest/download/CCLight.dmg">
+          Download CCLight.dmg <span class="arrow">↓</span>
+        </a>
+        <a class="btn" href="https://github.com/jianshuo/cclight" target="_blank" rel="noopener">
+          Source on GitHub <span class="arrow">↗</span>
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <span>macOS 14+</span>
+        <span class="sep">·</span>
+        <span>Apple Silicon</span>
+        <span class="sep">·</span>
+        <span>Signed &amp; Notarized</span>
+        <span class="sep">·</span>
+        <span>Free</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─────────────── STATES ─────────────── -->
+  <section class="states" id="states">
+    <div class="wrap">
+      <div class="section-label reveal">
+        <span class="num">01</span><span>The three colors</span><span class="bar"></span>
+      </div>
+
+      <div class="states-intro">
+        <h2 class="reveal">
+          A glance is enough. <em>Hover</em> a card to change the notch.
+        </h2>
+        <p class="reveal" data-delay="1">
+          Every Claude Code session is in exactly one of three states. CCLight reduces them to color — the language your eyes already speak before they read.
+        </p>
+      </div>
+
+      <div class="state-grid reveal" data-delay="2">
+        <button class="state-card working" data-state="working" data-active="true">
+          <span class="swatch"></span>
+          <h3>Working</h3>
+          <span class="hex">#FFB000 — AMBER</span>
+          <p>Claude is thinking, generating, running tools. Don't bother looking at the terminal; the notch will tell you when it's done.</p>
+          <p class="micro">Most of your time lives here.</p>
+        </button>
+
+        <button class="state-card waiting" data-state="waiting">
+          <span class="swatch"></span>
+          <h3>Waiting</h3>
+          <span class="hex">#5FCF7A — GREEN</span>
+          <p>Your turn to type. Claude is done, or it's asking a permission. After 5 minutes of inaction, this fades back to idle.</p>
+          <p class="micro">The only color that interrupts you.</p>
+        </button>
+
+        <button class="state-card idle" data-state="idle">
+          <span class="swatch"></span>
+          <h3>Idle</h3>
+          <span class="hex">#FFFFFF — DIM WHITE</span>
+          <p>Session is open but nothing's happening. Or it's done and you've walked away. The light is barely there — present, but quiet.</p>
+          <p class="micro">No glow. No demand. Just there.</p>
+        </button>
+      </div>
+
+      <p class="hover-hint">Hover the cards above ↑ &nbsp; the hero notch follows</p>
+    </div>
+  </section>
+
+  <!-- ─────────────── MULTI-SESSION ─────────────── -->
+  <section class="multi" id="multi">
+    <div class="wrap">
+      <div class="section-label reveal">
+        <span class="num">02</span><span>Many sessions, one glance</span><span class="bar"></span>
+      </div>
+
+      <div class="multi-head">
+        <h2 class="reveal">
+          Four sessions, four segments. <em>One arc</em> of light.
+        </h2>
+        <p class="reveal" data-delay="1">
+          When you run multiple Claude Code sessions in parallel, the U-shape splits into segments — one per session, in the order they were opened, up to four. Each segment carries its own color and its own halo. The menu bar dot summarizes them: any working → amber; otherwise any waiting → green; all idle → white.
+        </p>
+      </div>
+
+      <div class="multi-stage reveal" data-delay="2">
+        <div class="lid-mini">
+          <div class="notch" id="multi-notch">
+            <svg viewBox="-10 -10 400 110" width="400" height="110" aria-hidden="true">
+              <path class="body" d="M 30 -10 L 350 -10 L 350 26 Q 350 40 336 40 L 44 40 Q 30 40 30 26 Z" />
+              <g id="multi-segments"></g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="multi-toggle" role="tablist" aria-label="Active sessions">
+          <button data-n="1" class="active">1 session</button>
+          <button data-n="2">2</button>
+          <button data-n="3">3</button>
+          <button data-n="4">4</button>
+        </div>
+
+        <div class="caption">
+          Showing <strong id="multi-count">1</strong> active <span id="multi-noun">session</span>
+          <span class="sep" style="color: var(--ink-4)"> · </span>
+          colors assigned in open order
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── WHY ─────────────── -->
+  <section class="why">
+    <div class="wrap">
+      <div class="section-label reveal">
+        <span class="num">03</span><span>Why this exists</span><span class="bar"></span>
+      </div>
+
+      <div class="why-grid">
+        <div class="left">
+          <div class="kicker reveal">Notch as status line</div>
+          <h2 class="reveal" data-delay="1">
+            In your <em>peripheral</em> vision.
+          </h2>
+        </div>
+
+        <div class="right">
+          <p class="reveal" data-delay="1">
+            The Mac notch is the only screen real estate you can see without looking at it. CCLight turns it into a status line that doesn't demand a glance — it offers one.
+          </p>
+          <p class="reveal" data-delay="2">
+            No banners. No badges. No dock bounce. The light is there if you need it, invisible if you don't.
+          </p>
+          <p class="reveal" data-delay="3">
+            Built for people who keep several Claude sessions open and would rather think than tab-check. <em>It lives in the corner of your eye.</em>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── SPECS ─────────────── -->
+  <section class="specs" id="tech">
+    <div class="wrap">
+      <div class="section-label reveal">
+        <span class="num">04</span><span>Under the hood</span><span class="bar"></span>
+      </div>
+
+      <h2 class="reveal">
+        Native, local, <em>quiet</em>.<br />Zero telemetry, zero network.
+      </h2>
+
+      <div class="spec-grid reveal" data-delay="1">
+        <div class="spec">
+          <div class="label">Platform</div>
+          <div class="value">macOS 14<span class="unit">+</span></div>
+          <div class="note">Apple Silicon only. Tested through Sequoia.</div>
+        </div>
+        <div class="spec">
+          <div class="label">Renderer</div>
+          <div class="value">CAShape<span class="unit">·5 layers</span></div>
+          <div class="note">Core stroke + four blur radii: 6 / 14 / 28 / 50 / 80.</div>
+        </div>
+        <div class="spec">
+          <div class="label">State watcher</div>
+          <div class="value">FSEvents</div>
+          <div class="note">Single JSON file in an App Group container.</div>
+        </div>
+        <div class="spec">
+          <div class="label">Distribution</div>
+          <div class="value">Dev ID<span class="unit">+ notarized</span></div>
+          <div class="note">Stapled. Gatekeeper opens without a right-click.</div>
+        </div>
+        <div class="spec">
+          <div class="label">Network</div>
+          <div class="value">None</div>
+          <div class="note">No HTTP client, no analytics SDK, no crash reporter.</div>
+        </div>
+        <div class="spec">
+          <div class="label">Hooks</div>
+          <div class="value">Five</div>
+          <div class="note">Wired into <code>~/.claude/settings.json</code> via system dialog.</div>
+        </div>
+        <div class="spec">
+          <div class="label">Sessions</div>
+          <div class="value">Up to 4</div>
+          <div class="note">Five-minute idle timeout, ten-minute liveness.</div>
+        </div>
+        <div class="spec">
+          <div class="label">License</div>
+          <div class="value">Source-open</div>
+          <div class="note">Personal project, all rights reserved.</div>
+        </div>
+      </div>
+
+      <div class="hooks-block reveal" data-delay="2">
+        <div class="label">The five hooks CCLight installs</div>
+        <div class="hooks-table">
+          <div class="hook">SessionStart</div>      <div class="cmd">cclightcli set waiting</div>
+          <div class="hook">UserPromptSubmit</div>  <div class="cmd">cclightcli set working</div>
+          <div class="hook">Stop</div>              <div class="cmd">cclightcli set waiting</div>
+          <div class="hook">Notification</div>      <div class="cmd">cclightcli set waiting</div>
+          <div class="hook">SessionEnd</div>        <div class="cmd">cclightcli clear</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── CTA ─────────────── -->
+  <section class="cta">
+    <div class="wrap">
+      <h2 class="reveal">
+        Two minutes to install.<br />
+        <em>Forever</em> to unsee.
+      </h2>
+      <p class="reveal" data-delay="1">
+        Open the DMG, drag CCLight to Applications, launch once, click <strong>Install Hooks</strong>. That's it.
+      </p>
+
+      <div class="hero-ctas reveal" data-delay="2" style="margin-bottom: 0;">
+        <a class="btn primary" href="https://github.com/jianshuo/cclight/releases/latest/download/CCLight.dmg">
+          Download CCLight.dmg <span class="arrow">↓</span>
+        </a>
+        <a class="btn" href="https://github.com/jianshuo/cclight/releases/latest" target="_blank" rel="noopener">
+          All releases <span class="arrow">↗</span>
+        </a>
+      </div>
+
+      <div class="terminal reveal" data-delay="3">
+        <div class="head">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span style="margin-left: 8px;">terminal · build from source</span>
+        </div>
+<pre><span class="comment"># clone, build, and locally export a notarized DMG</span>
+<span class="prompt">$</span> git clone https://github.com/jianshuo/cclight.git
+<span class="prompt">$</span> cd cclight
+<span class="prompt">$</span> bash scripts/archive-and-export.sh --dmg
+<span class="comment"># → build/export/CCLight.dmg</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── FOOTER ─────────────── -->
+  <footer>
+    <div class="wrap">
+      <div class="col made">
+        <strong>CCLight</strong>
+        <em>A peripheral status line for Claude Code.</em><br />
+        macOS 14+ · Apple Silicon · Free
+      </div>
+      <div class="col">
+        <strong>Project</strong>
+        <a href="https://github.com/jianshuo/cclight">Source on GitHub</a><br />
+        <a href="https://github.com/jianshuo/cclight/releases/latest">Latest release</a><br />
+        <a href="https://github.com/jianshuo/cclight/issues">Issues &amp; questions</a><br />
+        <a href="privacy.html">Privacy policy</a>
+      </div>
+      <div class="col">
+        <strong>By</strong>
+        <a href="https://wangjianshuo.com" target="_blank" rel="noopener">王建硕</a><br />
+        Shanghai · 2026
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ─────────────────────────────────────────────
+    // state cycling — drives the hero notch + brand dot
+    // ─────────────────────────────────────────────
+    const states = [
+      { id: "working", color: "#ffb000", soft: "rgba(255, 176, 0, 0.18)", label: "Working" },
+      { id: "waiting", color: "#5fcf7a", soft: "rgba(95, 207, 122, 0.18)", label: "Waiting" },
+      { id: "idle",    color: "#f5f5f4", soft: "rgba(255, 255, 255, 0.10)", label: "Idle" },
+    ];
+    const labelEl  = document.getElementById("hero-state-label");
+    const root     = document.documentElement;
+    const cards    = Array.from(document.querySelectorAll(".state-card"));
+    let cycleIdx   = 0;
+    let cycleTimer = null;
+    let locked     = false;
+
+    function applyState(s) {
+      root.style.setProperty("--state", s.color);
+      root.style.setProperty("--state-soft", s.soft);
+      labelEl.textContent = s.label;
+      cards.forEach(c => c.dataset.active = (c.dataset.state === s.id) ? "true" : "false");
+    }
+
+    function startCycle() {
+      stopCycle();
+      cycleTimer = setInterval(() => {
+        cycleIdx = (cycleIdx + 1) % states.length;
+        applyState(states[cycleIdx]);
+      }, 2400);
+    }
+    function stopCycle() {
+      if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+    }
+
+    // hover on state card freezes the cycle to that state
+    cards.forEach(card => {
+      card.addEventListener("mouseenter", () => {
+        locked = true;
+        stopCycle();
+        const s = states.find(x => x.id === card.dataset.state);
+        if (s) { cycleIdx = states.indexOf(s); applyState(s); }
+      });
+      card.addEventListener("mouseleave", () => {
+        locked = false;
+        startCycle();
+      });
+      card.addEventListener("click", () => {
+        // also lock on click (touch / tap)
+        const s = states.find(x => x.id === card.dataset.state);
+        if (s) { cycleIdx = states.indexOf(s); applyState(s); }
+        stopCycle();
+        setTimeout(() => { if (!locked) startCycle(); }, 4000);
+      });
+    });
+
+    // honor reduced motion
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      applyState(states[0]);
+      startCycle();
+    } else {
+      applyState(states[0]);
+    }
+
+    // ─────────────────────────────────────────────
+    // multi-session toggle — paints N segments on the U-path
+    // ─────────────────────────────────────────────
+    const SEG_PATH  = "M 354 -10 L 354 26 Q 354 44 336 44 L 44 44 Q 26 44 26 26 L 26 -10";
+    const SEG_HOST  = document.getElementById("multi-segments");
+    const SEG_COUNT = document.getElementById("multi-count");
+    const SEG_COLS  = ["#ffb000", "#5fcf7a", "#ffb000", "#f5f5f4"];
+    // measure once
+    const measurer = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    measurer.setAttribute("d", SEG_PATH);
+    document.body.appendChild(measurer);
+    const TOTAL = measurer.getTotalLength();
+    measurer.remove();
+
+    function paintSegments(n) {
+      SEG_HOST.innerHTML = "";
+      const gap = 6;
+      const segLen = (TOTAL - gap * n) / n;
+      for (let i = 0; i < n; i++) {
+        const color = SEG_COLS[i];
+        const offset = -(i * (segLen + gap));
+        // glow stack per segment
+        const layers = [
+          { cls: "g5", w: 22, op: 0.14, blur: 50 },
+          { cls: "g4", w: 14, op: 0.22, blur: 28 },
+          { cls: "g3", w: 9,  op: 0.30, blur: 14 },
+          { cls: "g2", w: 5,  op: 0.40, blur: 7  },
+          { cls: "g1", w: 3,  op: 0.55, blur: 3  },
+          { cls: "core", w: 1.6, op: 1, blur: 0 },
+        ];
+        layers.forEach(l => {
+          const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          p.setAttribute("d", SEG_PATH);
+          p.setAttribute("fill", "none");
+          p.setAttribute("stroke", color);
+          p.setAttribute("stroke-width", l.w);
+          p.setAttribute("stroke-linecap", "round");
+          p.setAttribute("stroke-linejoin", "round");
+          p.setAttribute("stroke-dasharray", `${segLen} ${TOTAL}`);
+          p.setAttribute("stroke-dashoffset", `${offset}`);
+          p.setAttribute("opacity", l.op);
+          if (l.blur > 0) p.setAttribute("style", `filter: blur(${l.blur}px);`);
+          SEG_HOST.appendChild(p);
+        });
+      }
+      SEG_COUNT.textContent = n;
+      const noun = document.getElementById("multi-noun");
+      if (noun) noun.textContent = n === 1 ? "session" : "sessions";
+    }
+
+    document.querySelectorAll(".multi-toggle button").forEach(b => {
+      b.addEventListener("click", () => {
+        document.querySelectorAll(".multi-toggle button").forEach(x => x.classList.remove("active"));
+        b.classList.add("active");
+        paintSegments(parseInt(b.dataset.n, 10));
+      });
+    });
+    paintSegments(1);
+
+    // ─────────────────────────────────────────────
+    // scroll-triggered reveals
+    // ─────────────────────────────────────────────
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -10% 0px" });
+    document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+    // ─────────────────────────────────────────────
+    // nav shadow on scroll
+    // ─────────────────────────────────────────────
+    const nav = document.getElementById("topnav");
+    const onScroll = () => {
+      if (window.scrollY > 8) nav.classList.add("scrolled");
+      else nav.classList.remove("scrolled");
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  </script>
+</body>
+</html>
