@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "VibelightCore", targets: ["VibelightCore"]),
-        .executable(name: "vibelight", targets: ["vibelight"]),
+        .executable(name: "vibelight", targets: ["VibelightCLI"]),
     ],
     targets: [
         .target(
@@ -14,7 +14,7 @@ let package = Package(
             path: "Sources/VibelightCore"
         ),
         .executableTarget(
-            name: "vibelight",
+            name: "VibelightCLI",
             dependencies: ["VibelightCore"],
             path: "Sources/vibelight"
         ),
