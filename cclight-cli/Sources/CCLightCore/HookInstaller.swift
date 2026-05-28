@@ -8,11 +8,17 @@ public enum HookInstaller {
     /// `--reason <event>` so the overlay can tell *why* a state changed —
     /// e.g. `waiting/notification` (Claude paused for input) renders as
     /// "attention" while `waiting/stop` is a quiet "done".
+    ///
+    /// `set` calls also pass `--owner-pid $PPID` so the app can use
+    /// `kill(pid, 0)` to detect a dead Claude Code process instead of relying
+    /// on a time window. `$PPID` is expanded by the inner sh (see
+    /// `wrappedCommand`); from sh's vantage point its parent is the Claude
+    /// Code CLI that fired the hook.
     static let hookEvents: [(event: String, args: String)] = [
-        ("SessionStart",     "set waiting --reason \(HookReason.sessionStart.rawValue)"),
-        ("UserPromptSubmit", "set working --reason \(HookReason.userPrompt.rawValue)"),
-        ("Stop",             "set waiting --reason \(HookReason.stop.rawValue)"),
-        ("Notification",     "set waiting --reason \(HookReason.notification.rawValue)"),
+        ("SessionStart",     "set waiting --reason \(HookReason.sessionStart.rawValue) --owner-pid $PPID"),
+        ("UserPromptSubmit", "set working --reason \(HookReason.userPrompt.rawValue) --owner-pid $PPID"),
+        ("Stop",             "set waiting --reason \(HookReason.stop.rawValue) --owner-pid $PPID"),
+        ("Notification",     "set waiting --reason \(HookReason.notification.rawValue) --owner-pid $PPID"),
         ("SessionEnd",       "clear"),
     ]
 

@@ -120,6 +120,71 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertFalse(command(forEvent: "SessionEnd").contains("--reason"))
     }
 
+    func testInstalledSetCommandsContainOwnerPid() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+
+        func command(forEvent event: String) -> String {
+            let entries = hooks[event] as! [[String: Any]]
+            let inner = entries[0]["hooks"] as! [[String: Any]]
+            return inner[0]["command"] as! String
+        }
+
+        // Every `set` event must pass --owner-pid $PPID so the app can detect
+        // a dead Claude Code process via kill(pid, 0).
+        for event in ["SessionStart", "UserPromptSubmit", "Stop", "Notification"] {
+            XCTAssertTrue(
+                command(forEvent: event).contains("--owner-pid $PPID"),
+                "\(event) must include --owner-pid $PPID, got: \(command(forEvent: event))"
+            )
+        }
+        // SessionEnd is `clear`, no pid needed.
+        XCTAssertFalse(command(forEvent: "SessionEnd").contains("--owner-pid"))
+    }
+
+    func testInstalledSetCommandExpandsPPIDAtRuntime() throws {
+        // The hook wraps `--owner-pid $PPID` inside a sh -c '...' string.
+        // The inner sh must expand $PPID to its parent's pid — which in the
+        // real install is the Claude Code CLI invoking the hook. We can't
+        // simulate that exactly, but we can prove the variable expands at all
+        // and yields a numeric pid (≠ literal "$PPID").
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/bin/printenv")
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        let sessionStart = (hooks["SessionStart"] as! [[String: Any]])
+        let inner = (sessionStart[0]["hooks"] as! [[String: Any]])
+        let originalCommand = inner[0]["command"] as! String
+
+        // Replace the real binary call with `echo` so we can observe the
+        // expanded args. The wrapper structure (sh -c '...') is the same.
+        let echoCommand = originalCommand
+            .replacingOccurrences(of: "[ -x \"/usr/bin/printenv\" ] && \"/usr/bin/printenv\"",
+                                  with: "echo")
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+        proc.arguments = ["-c", echoCommand]
+        let outPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = Pipe()
+        try proc.run()
+        proc.waitUntilExit()
+        let out = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+
+        XCTAssertFalse(out.contains("$PPID"), "literal $PPID leaked unexpanded: \(out)")
+        // After `--owner-pid` there must be a numeric pid (split on any
+        // whitespace so a trailing newline doesn't get glued to the pid).
+        let parts = out.split(whereSeparator: { $0.isWhitespace })
+        guard let idx = parts.firstIndex(of: "--owner-pid"), idx + 1 < parts.count else {
+            return XCTFail("--owner-pid arg missing in: \(out)")
+        }
+        XCTAssertNotNil(Int(parts[idx + 1]), "expected numeric pid after --owner-pid, got: \(parts[idx + 1])")
+    }
+
     func testUninstallRemovesCCLightHooksKeepsOthers() throws {
         let existing = """
         {

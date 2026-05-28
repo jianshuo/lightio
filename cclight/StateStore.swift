@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Combine
 import CoreServices
 import CCLightCore
@@ -86,12 +87,17 @@ final class StateStore: ObservableObject {
     private func reload() {
         let rawSnapshot = (try? StateFile.read()) ?? StateSnapshot()
 
-        // Prune stale sessions: anything not updated in the last 10 minutes
-        // is treated as dead (covers Claude Code sessions killed without
-        // firing SessionEnd).
-        let staleAfter: TimeInterval = 10 * 60
-        let cutoff = Int(Date().timeIntervalSince1970 - staleAfter)
-        let liveSessions = rawSnapshot.sessions.filter { $0.value.ts >= cutoff }
+        // Liveness: for entries with a pid, check `kill(pid, 0)`. Alive →
+        // keep regardless of age (long-idle sessions stay visible). Dead →
+        // drop instantly (covers `kill -9`, closed terminal, crash). For
+        // legacy/manual entries that have no pid, fall back to a short
+        // 60-second ts window so test-injected entries don't pile up.
+        let manualFallback: TimeInterval = 60
+        let cutoff = Int(Date().timeIntervalSince1970 - manualFallback)
+        let liveSessions = rawSnapshot.sessions.filter { _, entry in
+            if let pid = entry.pid { return Self.processAlive(pid: pid) }
+            return entry.ts >= cutoff
+        }
         let snapshot = StateSnapshot(version: rawSnapshot.version, sessions: liveSessions)
         let pruned = rawSnapshot.sessions.count - liveSessions.count
 
@@ -125,6 +131,18 @@ final class StateStore: ObservableObject {
         case .idle:
             currentState = .idle
         }
+    }
+
+    /// `kill(pid, 0)` doesn't send a signal — it just runs the permission
+    /// check, so success means "this PID exists and we could signal it" and
+    /// `ESRCH` means "no such process". `EPERM` (exists but not ours) also
+    /// counts as alive — Claude Code spawns the hook as our own child so we
+    /// shouldn't see EPERM in practice, but treating it as alive is the
+    /// safe default.
+    private static func processAlive(pid: Int) -> Bool {
+        guard pid > 0 else { return false }
+        if kill(pid_t(pid), 0) == 0 { return true }
+        return errno == EPERM
     }
 
     private func startIdleTimer() {

@@ -78,6 +78,31 @@ final class StateFileTests: XCTestCase {
         XCTAssertEqual(reloaded.sessions["sess-n"]?.reason, .notification)
     }
 
+    func testRoundTripPreservesPid() throws {
+        let original = StateSnapshot(sessions: [
+            "sess-p": StateSnapshot.SessionEntry(
+                state: .working, ts: 1_700_000_000, cwd: nil, reason: nil, pid: 4242
+            ),
+        ])
+        try StateFile.write(original)
+        let reloaded = try StateFile.read()
+        XCTAssertEqual(reloaded.sessions["sess-p"]?.pid, 4242)
+    }
+
+    func testReadOldStateJSONWithoutPidField() throws {
+        // Legacy entry written by a pre-pid binary — pid key absent. Optional
+        // decoding must default it to nil, not throw.
+        let legacy = #"""
+        {"version":1,"sessions":{"s":{"state":"working","ts":1700000000,"cwd":"/tmp"}}}
+        """#
+        try FileManager.default.createDirectory(at: Paths.stateDir, withIntermediateDirectories: true)
+        try legacy.data(using: .utf8)!.write(to: Paths.stateFile)
+
+        let reloaded = try StateFile.read()
+        XCTAssertEqual(reloaded.sessions["s"]?.state, .working)
+        XCTAssertNil(reloaded.sessions["s"]?.pid)
+    }
+
     func testReadOldStateJSONWithoutReasonField() throws {
         // Simulate an entry written by a pre-reason cclight binary — reason
         // key absent. Optional decoding must default it to nil, not throw.

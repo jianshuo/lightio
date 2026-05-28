@@ -41,6 +41,35 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(snapshot.sessions["n1"]?.reason, .notification)
     }
 
+    func testSetWithOwnerPidFlagPersistsPid() throws {
+        let payload = #"{"session_id":"p1","cwd":"/tmp/p"}"#
+        let result = try runCLI(args: ["set", "working", "--owner-pid", "9876"], stdin: payload)
+        XCTAssertEqual(result.exitCode, 0, "stderr=\(result.stderr)")
+
+        setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
+        defer { unsetenv("VIBELIGHT_STATE_DIR") }
+        let snapshot = try StateFile.read()
+        XCTAssertEqual(snapshot.sessions["p1"]?.pid, 9876)
+    }
+
+    func testSetWithoutOwnerPidFlagLeavesPidNil() throws {
+        _ = try runCLI(args: ["set", "working"], stdin: #"{"session_id":"p2"}"#)
+        setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
+        defer { unsetenv("VIBELIGHT_STATE_DIR") }
+        let snapshot = try StateFile.read()
+        XCTAssertNil(snapshot.sessions["p2"]?.pid)
+    }
+
+    func testSetWithBogusOwnerPidFlagFallsBackToNil() throws {
+        // If the wrapper ever leaks an unexpanded `$PPID` literal, the CLI
+        // should treat it as no pid rather than corrupting state.
+        _ = try runCLI(args: ["set", "working", "--owner-pid", "$PPID"], stdin: #"{"session_id":"p3"}"#)
+        setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
+        defer { unsetenv("VIBELIGHT_STATE_DIR") }
+        let snapshot = try StateFile.read()
+        XCTAssertNil(snapshot.sessions["p3"]?.pid)
+    }
+
     func testSetWithoutReasonFlagLeavesReasonNil() throws {
         let payload = #"{"session_id":"u1"}"#
         _ = try runCLI(args: ["set", "working"], stdin: payload)

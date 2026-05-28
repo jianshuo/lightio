@@ -9,3 +9,4 @@ xcuserdata/
 cclight-cli/.build/
 cclight-cli/.swiftpm/
 cclight-cli/Package.resolved
+.gstack/

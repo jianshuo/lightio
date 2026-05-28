@@ -16,17 +16,20 @@ func run(_ args: [String]) -> Int32 {
             guard args.count >= 2,
                   let state = SessionState(rawValue: args[1])
             else {
-                FileHandle.standardError.write(Data("Usage: cclight set <working|waiting> [--reason <reason>]\n".utf8))
+                FileHandle.standardError.write(Data("Usage: cclight set <working|waiting> [--reason <reason>] [--owner-pid <pid>]\n".utf8))
                 return 2
             }
-            let reason = parseReason(in: Array(args.dropFirst(2)))
+            let tail = Array(args.dropFirst(2))
+            let reason = parseReason(in: tail)
+            let ownerPid = parseOwnerPid(in: tail)
             let input = try HookInputJSON.parse(readStdin())
             try StateFile.update { snapshot in
                 snapshot.sessions[input.sessionId] = StateSnapshot.SessionEntry(
                     state: state,
                     ts: Int(Date().timeIntervalSince1970),
                     cwd: input.cwd,
-                    reason: reason
+                    reason: reason,
+                    pid: ownerPid
                 )
             }
             return 0
@@ -75,6 +78,14 @@ func parseReason(in args: [String]) -> HookReason? {
     return HookReason(rawValue: args[idx + 1])
 }
 
+/// Parse `--owner-pid <int>`. Bad input (non-numeric, the literal `$PPID`
+/// shell variable if the wrapper somehow leaked unexpanded) → nil, so a
+/// broken hook never blocks the state write.
+func parseOwnerPid(in args: [String]) -> Int? {
+    guard let idx = args.firstIndex(of: "--owner-pid"), idx + 1 < args.count else { return nil }
+    return Int(args[idx + 1])
+}
+
 func readStdin() -> Data {
     var buf = Data()
     let handle = FileHandle.standardInput
@@ -89,8 +100,9 @@ func readStdin() -> Data {
 func printUsage() {
     let msg = """
     Usage: cclight <command>
-      set <working|waiting> [--reason <session-start|user-prompt|stop|notification>]
-                               Update this session's state (reads hook JSON from stdin)
+      set <working|waiting> [--reason <session-start|user-prompt|stop|notification>] [--owner-pid <pid>]
+                               Update this session's state (reads hook JSON from stdin).
+                               --owner-pid lets the app detect a dead Claude Code process.
       clear                    Remove this session (reads hook JSON from stdin)
       status                   Print current state.json
       install-hooks            Install cclight hooks into ~/.claude/settings.json

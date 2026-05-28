@@ -10,12 +10,18 @@ public struct StateSnapshot: Codable, Equatable, Sendable {
         public var ts: Int
         public var cwd: String?
         public var reason: HookReason?
+        /// PID of the Claude Code process that owns this session. The app
+        /// uses `kill(pid, 0)` to decide whether the entry is still live,
+        /// replacing the previous time-window prune. Nil means legacy/manual
+        /// entry — the app falls back to a short ts cutoff.
+        public var pid: Int?
 
-        public init(state: SessionState, ts: Int, cwd: String?, reason: HookReason? = nil) {
+        public init(state: SessionState, ts: Int, cwd: String?, reason: HookReason? = nil, pid: Int? = nil) {
             self.state = state
             self.ts = ts
             self.cwd = cwd
             self.reason = reason
+            self.pid = pid
         }
     }
 
