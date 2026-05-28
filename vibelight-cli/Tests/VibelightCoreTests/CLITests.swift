@@ -90,7 +90,7 @@ final class CLITests: XCTestCase {
         let pkgRoot = here.deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let debug = pkgRoot.appendingPathComponent(".build/debug/vibelight")
+        let debug = pkgRoot.appendingPathComponent(".build/debug/vibelightcli")
         if FileManager.default.fileExists(atPath: debug.path) { return debug }
         let arches = (try? FileManager.default.contentsOfDirectory(
             atPath: pkgRoot.appendingPathComponent(".build").path)) ?? []

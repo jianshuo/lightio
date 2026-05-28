@@ -3,164 +3,220 @@ import Combine
 import QuartzCore
 import VibelightCore
 
-/// Renders the glow underneath the notch. Driven by a published `MergedState`.
+/// Per PROJECT.md: a low-key thin line wrapping the notch with a subtle halo
+/// glow. Extended for multi-session: the U-shape outline is split into N equal
+/// segments (capped at 4 by StateStore), each colored by its session's state.
+///
+/// Implementation: N `CAShapeLayer`s all stroke the same U-path but each uses
+/// `strokeStart` / `strokeEnd` to render only its 1/N portion. Each layer
+/// owns its own colored shadow so per-segment glows don't bleed into the full
+/// U-shape (no shared `shadowPath`).
 final class NotchOverlayView: NSView {
-    private let glowLayer = CALayer()
-    private let outerGlowLayer = CALayer()
-    private let lineLayer = CALayer()
+    private let notchSize: CGSize
     private var subs: Set<AnyCancellable> = []
-    private var currentState: MergedState = .idle
+    /// 5 stacked layers per segment matching the variant-10 "Steady Neon"
+    /// box-shadow stack: a crisp solid line + four progressively-soft glow
+    /// halos at radii 6 / 14 / 28 / 50 with opacities 0.9 / 0.7 / 0.4 / 0.2.
+    private struct SegmentLayers {
+        let line = CAShapeLayer()    // crisp solid stroke (no shadow)
+        let glow1 = CAShapeLayer()   // tight halo, r=6
+        let glow2 = CAShapeLayer()   // medium halo, r=14
+        let glow3 = CAShapeLayer()   // wide halo, r=28
+        let glow4 = CAShapeLayer()   // soft aura, r=50
+        let glow5 = CAShapeLayer()   // faint outer aura, r=80
+        var all: [CAShapeLayer] { [line, glow1, glow2, glow3, glow4, glow5] }
+    }
+    private var segments: [SegmentLayers] = []
+    private var currentStates: [SessionState] = []
+    private var cachedPath: CGPath?
 
-    init(notchSizeInWindow: CGSize) {
+    init(notchSize: CGSize) {
+        self.notchSize = notchSize
         super.init(frame: .zero)
         wantsLayer = true
         layer = CALayer()
         layer?.masksToBounds = false
-        setupSublayers(notchSize: notchSizeInWindow)
-        applyState(.idle, animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// Subscribe to a MergedState publisher (e.g. StateStore.$currentState).
-    func bind<P: Publisher>(_ publisher: P) where P.Output == MergedState, P.Failure == Never {
+    func bindSessions<P: Publisher>(_ publisher: P) where P.Output == [SessionState], P.Failure == Never {
         publisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in self?.applyState(state, animated: true) }
+            .sink { [weak self] states in self?.apply(states: states, animated: true) }
             .store(in: &subs)
     }
 
-    // MARK: - Layout
-
     override func layout() {
         super.layout()
-        layoutSublayers()
+        rebuildPath()
+        relayoutSegments()
     }
 
-    private func setupSublayers(notchSize: CGSize) {
-        // The notch occupies the top-center of the window. The line and glow
-        // hug the *bottom edge* of that notch.
-        layer?.addSublayer(outerGlowLayer)
-        layer?.addSublayer(glowLayer)
-        layer?.addSublayer(lineLayer)
+    // MARK: - Path
 
-        outerGlowLayer.shadowOpacity = 0.4
-        outerGlowLayer.shadowRadius = 32
-        outerGlowLayer.shadowOffset = .zero
-        outerGlowLayer.backgroundColor = NSColor.clear.cgColor
-
-        glowLayer.shadowOpacity = 0.85
-        glowLayer.shadowRadius = 18
-        glowLayer.shadowOffset = .zero
-        glowLayer.backgroundColor = NSColor.clear.cgColor
-
-        lineLayer.cornerRadius = 1
-    }
-
-    private func layoutSublayers() {
+    private func rebuildPath() {
         let b = bounds
-        // Notch rect, centered horizontally, at the top of the window.
-        // The window frame was inset by `glowPadding` on all sides, so the
-        // notch sits `glowPadding` from the top.
-        let pad: CGFloat = 40
-        let notchWidth = b.width - pad * 2
-        let notchHeight: CGFloat = 32
+        let cornerRadius: CGFloat = 12
+        // notch centered horizontally, at the top of the view (AppDelegate
+        // creates window as notchRect.insetBy(-glowPadding, -glowPadding)).
+        let glowPadding: CGFloat = 90
         let notchRect = CGRect(
-            x: pad,
-            y: b.height - pad - notchHeight,
-            width: notchWidth,
-            height: notchHeight
+            x: (b.width - notchSize.width) / 2,
+            y: b.height - glowPadding - notchSize.height,
+            width: notchSize.width,
+            height: notchSize.height
         )
 
-        // Line: 1pt strip at the BOTTOM edge of the notch.
-        lineLayer.frame = CGRect(
-            x: notchRect.minX + 6,
-            y: notchRect.minY,
-            width: notchRect.width - 12,
-            height: 1.5
+        // U-shape outline path: top-right → down → arc → across → arc → up → top-left.
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: notchRect.maxX, y: notchRect.maxY))
+        path.addLine(to: CGPoint(x: notchRect.maxX, y: notchRect.minY + cornerRadius))
+        path.addArc(
+            center: CGPoint(x: notchRect.maxX - cornerRadius, y: notchRect.minY + cornerRadius),
+            radius: cornerRadius,
+            startAngle: 0, endAngle: -.pi / 2, clockwise: true
         )
-
-        // Glow source: the shape of the line, but with bigger shadow radii.
-        for shadow in [glowLayer, outerGlowLayer] {
-            shadow.frame = lineLayer.frame
-            shadow.shadowPath = CGPath(rect: shadow.bounds, transform: nil)
-        }
+        path.addLine(to: CGPoint(x: notchRect.minX + cornerRadius, y: notchRect.minY))
+        path.addArc(
+            center: CGPoint(x: notchRect.minX + cornerRadius, y: notchRect.minY + cornerRadius),
+            radius: cornerRadius,
+            startAngle: -.pi / 2, endAngle: -.pi, clockwise: true
+        )
+        path.addLine(to: CGPoint(x: notchRect.minX, y: notchRect.maxY))
+        cachedPath = path
     }
 
-    // MARK: - State
+    // MARK: - Apply
 
-    private func applyState(_ state: MergedState, animated: Bool) {
-        let newColor = Self.cgColor(for: state)
-        let newOpacity: Float = (state == .idle) ? 0.15 : 1.0
-        let previousState = currentState
-        currentState = state
+    private func apply(states: [SessionState], animated: Bool) {
+        NSLog("vibelight: apply states=\(states.map { $0.rawValue })")
 
-        // Reduce-motion users get an instant swap.
-        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let shouldPulse = animated && !reduceMotion && state != previousState
+        let effectiveCount = max(states.count, 1)
+        ensureSegmentCount(effectiveCount)
+        relayoutSegments()
 
-        if !shouldPulse {
+        for i in 0..<effectiveCount {
+            let segment = segments[i]
+            let state: MergedState
+            if states.isEmpty {
+                state = .idle
+            } else {
+                state = (states[i] == .working) ? .working : .waiting
+            }
+            let color = Self.cgColor(for: state)
+            let opacity: Float = (state == .idle) ? 0.20 : 1.0
+
             CATransaction.begin()
-            CATransaction.setAnimationDuration(animated ? 0.05 : 0)
-            glowLayer.shadowColor = newColor
-            outerGlowLayer.shadowColor = newColor
-            lineLayer.backgroundColor = newColor
-            glowLayer.opacity = newOpacity
-            outerGlowLayer.opacity = newOpacity
-            lineLayer.opacity = newOpacity
+            CATransaction.setAnimationDuration(animated ? 0.35 : 0)
+            for shape in segment.all {
+                shape.strokeColor = color
+                shape.shadowColor = color
+                shape.opacity = opacity
+            }
             CATransaction.commit()
-            return
+
+            applyBreath(to: segment, working: state == .working)
         }
 
-        // Ding pulse: 0ms current → 150ms white → 350ms new color.
-        let whiteColor = NSColor.white.cgColor
-        for layer in [glowLayer, outerGlowLayer, lineLayer] {
-            let key = "ding-pulse"
-            layer.removeAnimation(forKey: key)
+        currentStates = states
+    }
 
-            let property = (layer === lineLayer) ? "backgroundColor" : "shadowColor"
-            let anim = CAKeyframeAnimation(keyPath: property)
-            anim.duration = 0.35
-            anim.values = [
-                layer.presentation()?.value(forKeyPath: property) as Any,
-                whiteColor,
-                newColor as Any,
-            ]
-            anim.keyTimes = [0.0, 0.42, 1.0]
-            anim.timingFunctions = [
-                CAMediaTimingFunction(name: .easeOut),
-                CAMediaTimingFunction(name: .easeIn),
-            ]
-            anim.isRemovedOnCompletion = true
-            layer.add(anim, forKey: key)
-            layer.setValue(newColor, forKeyPath: property)
-        }
-
-        // Opacity transitions in parallel — fade-in of the new color over 350ms.
-        let opacityAnim = CABasicAnimation(keyPath: "opacity")
-        opacityAnim.duration = 0.35
-        opacityAnim.fromValue = max(glowLayer.opacity, 0.5)
-        opacityAnim.toValue = newOpacity
-        for layer in [glowLayer, outerGlowLayer, lineLayer] {
-            layer.opacity = newOpacity
-            layer.add(opacityAnim, forKey: "ding-opacity")
+    /// Breathing halo: when a segment is `.working`, the soft outer glow
+    /// layers pulse 45%↔100% opacity. The crisp line layer stays steady so
+    /// the U-shape outline remains sharp — only the aura breathes.
+    ///
+    /// Idempotent: if the breath animation is already running we leave it
+    /// alone, so apply() being called on every StateStore publish doesn't
+    /// constantly reset the phase.
+    private func applyBreath(to segment: SegmentLayers, working: Bool) {
+        let breathing = [segment.glow1, segment.glow2, segment.glow3, segment.glow4, segment.glow5]
+        if working {
+            guard breathing.first?.animation(forKey: "breath") == nil else { return }
+            let breath = CABasicAnimation(keyPath: "opacity")
+            breath.fromValue = 0.45
+            breath.toValue = 1.0
+            breath.duration = 1.8
+            breath.autoreverses = true
+            breath.repeatCount = .infinity
+            breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            for layer in breathing {
+                layer.add(breath, forKey: "breath")
+            }
+        } else {
+            for layer in breathing {
+                layer.removeAnimation(forKey: "breath")
+            }
         }
     }
 
-    /// Force the view to a specific state without going through the publisher.
-    /// Used only for the startup self-test flash.
+    private func ensureSegmentCount(_ count: Int) {
+        while segments.count < count {
+            let s = SegmentLayers()
+            // Z-order: widest soft aura at bottom, crispest line on top.
+            for shape in [s.glow5, s.glow4, s.glow3, s.glow2, s.glow1, s.line] {
+                shape.fillColor = NSColor.clear.cgColor
+                shape.lineCap = .butt
+                shape.lineJoin = .round
+                shape.lineWidth = 3.0
+                shape.shadowOffset = .zero
+                layer?.addSublayer(shape)
+            }
+            s.line.shadowOpacity = 0
+            s.glow1.shadowOpacity = 1.0
+            s.glow1.shadowRadius = 6
+            s.glow2.shadowOpacity = 1.0
+            s.glow2.shadowRadius = 14
+            s.glow3.shadowOpacity = 0.9
+            s.glow3.shadowRadius = 28
+            s.glow4.shadowOpacity = 0.7
+            s.glow4.shadowRadius = 50
+            s.glow5.shadowOpacity = 0.4
+            s.glow5.shadowRadius = 80
+            segments.append(s)
+        }
+        while segments.count > count {
+            let s = segments.removeLast()
+            for shape in s.all { shape.removeFromSuperlayer() }
+        }
+    }
+
+    private func relayoutSegments() {
+        guard let path = cachedPath else { return }
+        let count = segments.count
+        guard count > 0 else { return }
+        for (i, segment) in segments.enumerated() {
+            let start = CGFloat(i) / CGFloat(count)
+            let end = CGFloat(i + 1) / CGFloat(count)
+            for shape in segment.all {
+                shape.path = path
+                shape.frame = bounds
+                shape.shadowPath = nil  // per-segment glow, not full U
+                shape.strokeStart = start
+                shape.strokeEnd = end
+            }
+        }
+    }
+
+    /// Force the view to a specific state — used only for the startup self-test.
     func previewState(_ state: MergedState) {
-        applyState(state, animated: true)
+        let s: SessionState? = (state == .working) ? .working
+            : (state == .waiting) ? .waiting
+            : nil
+        apply(states: s.map { [$0] } ?? [], animated: true)
     }
 
     static func cgColor(for state: MergedState) -> CGColor {
         switch state {
         case .working:
-            return NSColor(red: 95/255.0, green: 207/255.0, blue: 122/255.0, alpha: 1).cgColor
+            // Amber #FFB000 — Claude actively running. Per design v10 palette.
+            return NSColor(red: 255/255.0, green: 176/255.0, blue: 0/255.0, alpha: 1).cgColor
         case .waiting:
-            return NSColor(red: 245/255.0, green: 166/255.0, blue: 35/255.0, alpha: 1).cgColor
+            // Green — your turn, Claude ready.
+            return NSColor(red: 95/255.0, green: 207/255.0, blue: 122/255.0, alpha: 1).cgColor
         case .idle:
-            return NSColor(white: 0.85, alpha: 1).cgColor
+            // White — fully done / inactive.
+            return NSColor.white.cgColor
         }
     }
 }

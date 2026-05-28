@@ -2,6 +2,12 @@ import AppKit
 import Combine
 import VibelightCore
 
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 /// Owns the menu-bar status item: a tinted dot whose color tracks the merged
 /// state, and a menu with the install/uninstall hooks actions.
 final class MenuBarController: NSObject, NSMenuDelegate {
@@ -27,7 +33,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             .sink { [weak self] state in self?.setupButtonIcon(state: state) }
             .store(in: &subs)
 
-        store.$sessionCount
+        store.$orderedSessionStates
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshMenu() }
             .store(in: &subs)
@@ -39,9 +45,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let image = NSImage(size: size, flipped: false) { rect in
             let dotRect = NSRect(x: 3, y: 3, width: 8, height: 8)
             switch state {
-            case .working: NSColor(red: 95/255, green: 207/255, blue: 122/255, alpha: 1).setFill()
-            case .waiting: NSColor(red: 245/255, green: 166/255, blue: 35/255, alpha: 1).setFill()
-            case .idle:    NSColor(white: 0.6, alpha: 1).setFill()
+            case .working: NSColor(red: 255/255, green: 176/255, blue: 0/255, alpha: 1).setFill()
+            case .waiting: NSColor(red: 95/255, green: 207/255, blue: 122/255, alpha: 1).setFill()
+            case .idle:    NSColor.white.setFill()
             }
             NSBezierPath(ovalIn: dotRect).fill()
             return true
@@ -59,32 +65,51 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func refreshMenu() {
-        guard let menu = statusItem.menu else { return }
+        guard let menu = statusItem.menu, let store = store else { return }
         menu.removeAllItems()
 
-        let stateLine = NSMenuItem(
-            title: stateMenuTitle(),
-            action: nil, keyEquivalent: ""
-        )
-        stateLine.isEnabled = false
-        menu.addItem(stateLine)
+        // Per-session rows with colored dots. Capped at 4 by StateStore.
+        let states = store.orderedSessionStates
+        let ids = store.orderedSessionIds
+        let cwds = store.orderedSessionCwds
+        if states.isEmpty {
+            let idle = NSMenuItem(title: "  No active sessions", action: nil, keyEquivalent: "")
+            idle.isEnabled = false
+            menu.addItem(idle)
+        } else {
+            let header = NSMenuItem(title: "Sessions (\(states.count))", action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+            for (i, state) in states.enumerated() {
+                let name = Self.displayName(cwd: cwds[safe: i] ?? nil, id: ids[safe: i])
+                let label = "\(name) — \(state == .working ? "working" : "waiting")"
+                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                item.image = Self.dotImage(forSessionState: state)
+                menu.addItem(item)
+            }
+        }
         menu.addItem(.separator())
 
+        // Hooks submenu (install / uninstall).
+        let hooksItem = NSMenuItem(title: "Hooks", action: nil, keyEquivalent: "")
+        let hooksSubmenu = NSMenu()
         let installItem = NSMenuItem(
             title: "Install Claude Code Hooks",
             action: #selector(installHooks),
             keyEquivalent: ""
         )
         installItem.target = self
-        menu.addItem(installItem)
-
+        hooksSubmenu.addItem(installItem)
         let uninstallItem = NSMenuItem(
             title: "Uninstall Claude Code Hooks",
             action: #selector(uninstallHooks),
             keyEquivalent: ""
         )
         uninstallItem.target = self
-        menu.addItem(uninstallItem)
+        hooksSubmenu.addItem(uninstallItem)
+        hooksItem.submenu = hooksSubmenu
+        menu.addItem(hooksItem)
 
         menu.addItem(.separator())
 
@@ -97,24 +122,39 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         launchItem.state = isLaunchAtLoginOn() ? .on : .off
         menu.addItem(launchItem)
 
-        menu.addItem(.separator())
-
-        let about = NSMenuItem(title: "About vibelight", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: "About Vibe Light", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
-    private func stateMenuTitle() -> String {
-        guard let store = store else { return "vibelight" }
-        let stateLabel: String
-        switch store.currentState {
-        case .working: stateLabel = "WORKING"
-        case .waiting: stateLabel = "WAITING"
-        case .idle:    stateLabel = "IDLE"
+    /// Pick a human-readable display name. Prefer the cwd's last path component
+    /// (e.g. `vibelight` for `/Users/x/code/vibelight`); fall back to the
+    /// short session id.
+    private static func displayName(cwd: String?, id: String?) -> String {
+        if let cwd = cwd, !cwd.isEmpty {
+            let base = (cwd as NSString).lastPathComponent
+            if !base.isEmpty { return base }
         }
-        return "状态: \(stateLabel) (\(store.sessionCount) session\(store.sessionCount == 1 ? "" : "s"))"
+        return String(id?.prefix(8) ?? "?")
+    }
+
+    private static func dotImage(forSessionState state: SessionState) -> NSImage {
+        let size = NSSize(width: 12, height: 12)
+        let image = NSImage(size: size, flipped: false) { _ in
+            let dotRect = NSRect(x: 2, y: 2, width: 8, height: 8)
+            switch state {
+            case .working:
+                NSColor(red: 245/255, green: 166/255, blue: 35/255, alpha: 1).setFill()
+            case .waiting:
+                NSColor.white.setFill()
+            }
+            NSBezierPath(ovalIn: dotRect).fill()
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 
     // MARK: - Actions

@@ -6,11 +6,23 @@ import VibelightCore
 /// Watches `~/.vibelight/state.json` and publishes the current merged state
 /// to subscribers. Owns the 5-minute idle timer.
 final class StateStore: ObservableObject {
-    /// Currently-published state. NotchOverlay subscribes to this.
+    /// Merged state across all sessions (priority working > waiting > idle).
+    /// MenuBarController uses this for the status dot.
     @Published private(set) var currentState: MergedState = .idle
 
     /// Active session count (for menu display).
     @Published private(set) var sessionCount: Int = 0
+
+    /// Per-session states (capped at 4 most-recent), sorted by session_id for
+    /// stable ordering. NotchOverlayView uses this to render one halo per session.
+    @Published private(set) var orderedSessionStates: [SessionState] = []
+
+    /// Session IDs parallel to orderedSessionStates, for menu display.
+    @Published private(set) var orderedSessionIds: [String] = []
+
+    /// Session working directories parallel to orderedSessionStates. Menu
+    /// renders the cwd basename as the session's display name.
+    @Published private(set) var orderedSessionCwds: [String?] = []
 
     private var stream: FSEventStreamRef?
     private var idleTimer: DispatchSourceTimer?
@@ -70,9 +82,28 @@ final class StateStore: ObservableObject {
 
     /// Re-read state.json, recompute merged state, manage idle timer.
     private func reload() {
-        let snapshot = (try? StateFile.read()) ?? StateSnapshot()
+        let rawSnapshot = (try? StateFile.read()) ?? StateSnapshot()
+
+        // Prune stale sessions: anything not updated in the last 10 minutes
+        // is treated as dead (covers Claude Code sessions killed without
+        // firing SessionEnd).
+        let staleAfter: TimeInterval = 10 * 60
+        let cutoff = Int(Date().timeIntervalSince1970 - staleAfter)
+        let liveSessions = rawSnapshot.sessions.filter { $0.value.ts >= cutoff }
+        let snapshot = StateSnapshot(version: rawSnapshot.version, sessions: liveSessions)
+        let pruned = rawSnapshot.sessions.count - liveSessions.count
+
         let merged = MergedState.merge(snapshot: snapshot)
-        sessionCount = snapshot.sessions.count
+        NSLog("vibelight: reload — \(snapshot.sessions.count) session(s) (pruned \(pruned)), merged=\(merged)")
+        // Cap at 4 most-recently-active sessions for display.
+        let topSessions = snapshot.sessions
+            .sorted { $0.value.ts > $1.value.ts }  // newest first
+            .prefix(4)
+        sessionCount = topSessions.count
+        let sortedTop = topSessions.sorted { $0.key < $1.key }
+        orderedSessionStates = sortedTop.map { $0.value.state }
+        orderedSessionIds = sortedTop.map { $0.key }
+        orderedSessionCwds = sortedTop.map { $0.value.cwd }
 
         // Cancel any running idle timer; we'll restart if needed.
         idleTimer?.cancel()

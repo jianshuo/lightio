@@ -12,16 +12,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store = StateStore()
         store.start()
 
-        if let screen = NSScreen.main,
-           let notchRect = NotchGeometry.notchRect(for: screen) {
-            let frame = NotchGeometry.overlayWindowFrame(notchRect: notchRect, glowPadding: 40)
-            overlayWindow = NotchOverlayWindow(contentRect: frame)
-            overlayView = NotchOverlayView(notchSizeInWindow: notchRect.size)
-            overlayWindow.contentView = overlayView
-            overlayWindow.orderFrontRegardless()
-            overlayView.bind(store.$currentState)
+        if let screen = NSScreen.main {
+            let insets = screen.safeAreaInsets
+            NSLog("vibelight: screen frame=\(screen.frame), safeAreaInsets.top=\(insets.top), aux.left=\(String(describing: screen.auxiliaryTopLeftArea)), aux.right=\(String(describing: screen.auxiliaryTopRightArea))")
+            if let notchRect = NotchGeometry.notchRect(for: screen) {
+                NSLog("vibelight: notchRect=\(notchRect)")
+                let frame = NotchGeometry.overlayWindowFrame(notchRect: notchRect, glowPadding: 90)
+                overlayWindow = NotchOverlayWindow(contentRect: frame)
+                overlayView = NotchOverlayView(notchSize: notchRect.size)
+                overlayWindow.contentView = overlayView
+                overlayWindow.orderFrontRegardless()
+                overlayView.bindSessions(store.$orderedSessionStates)
+            } else {
+                NSLog("vibelight: no notch detected; overlay disabled")
+            }
         } else {
-            NSLog("vibelight: no notch detected; overlay disabled")
+            NSLog("vibelight: NSScreen.main is nil")
         }
 
         menuBar = MenuBarController(store: store)
@@ -42,9 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func runFirstRunIfNeeded() {
+        NSApp.activate(ignoringOtherApps: true)
         if !FirstRun.isSymlinkInstalled() {
             let alert = NSAlert()
-            alert.messageText = "Install vibelight CLI?"
+            alert.messageText = "Install Vibe Light CLI?"
             alert.informativeText = """
             需要把 CLI 安装到 /usr/local/bin/vibelight，
             这一步需要管理员密码（一次性）。
@@ -72,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if FirstRun.installHooks() {
             let alert = NSAlert()
             alert.messageText = "Hooks installed"
-            alert.informativeText = "vibelight hooks added to ~/.claude/settings.json"
+            alert.informativeText = "Vibe Light hooks added to ~/.claude/settings.json"
             alert.runModal()
         } else {
             let alert = NSAlert()

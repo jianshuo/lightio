@@ -10,7 +10,7 @@ enum FirstRun {
     /// Path to the CLI bundled inside this .app.
     static var bundledCLIPath: String {
         Bundle.main.resourcePath.map { "\($0)/vibelight" }
-            ?? "/Applications/vibelight.app/Contents/Resources/vibelight"
+            ?? "/Applications/VibeLight.app/Contents/Resources/vibelight"
     }
 
     // MARK: - Symlink

@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "VibelightCore", targets: ["VibelightCore"]),
-        .executable(name: "vibelight", targets: ["VibelightCLI"]),
+        .executable(name: "vibelightcli", targets: ["VibelightCLI"]),
     ],
     targets: [
         .target(
