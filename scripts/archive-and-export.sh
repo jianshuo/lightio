@@ -57,13 +57,24 @@ EXPORT_OPTS="$ROOT/scripts/ExportOptions.plist"
 mkdir -p "$ROOT/build"
 rm -rf "$ARCHIVE" "$EXPORT_DIR"
 
-# Build number stamping so each archive is unique under the current
-# marketing version (some downstream tools, e.g. Sparkle update feeds,
-# rely on a monotonically increasing build number).
-BUILD_NUMBER="$(date +%Y%m%d%H%M)"
-echo "==> Bumping CURRENT_PROJECT_VERSION → $BUILD_NUMBER"
-sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" \
-  cclight.xcodeproj/project.pbxproj
+# Version stamping. For `--release vX.Y.Z`: set both MARKETING_VERSION and
+# CURRENT_PROJECT_VERSION to X.Y.Z so the shipped build's Info.plist matches
+# the tag. For dev archives (no --release): bump only CURRENT_PROJECT_VERSION
+# to a date-based monotonic value so archives stay distinguishable without
+# touching the marketing string.
+if [ -n "$RELEASE_TAG" ]; then
+  VERSION="${RELEASE_TAG#v}"
+  echo "==> Stamping MARKETING_VERSION + CURRENT_PROJECT_VERSION → $VERSION"
+  sed -i '' \
+    -e "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $VERSION;/g" \
+    -e "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = $VERSION;/g" \
+    cclight.xcodeproj/project.pbxproj
+else
+  BUILD_NUMBER="$(date +%Y%m%d%H%M)"
+  echo "==> Bumping CURRENT_PROJECT_VERSION → $BUILD_NUMBER (dev archive)"
+  sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" \
+    cclight.xcodeproj/project.pbxproj
+fi
 
 echo "==> Archive"
 xcodebuild \
