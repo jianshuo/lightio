@@ -16,6 +16,9 @@ public enum Paths {
     }
 
     public static var claudeSettingsFile: URL {
+        if let override = ProcessInfo.processInfo.environment["VIBELIGHT_CLAUDE_DIR"] {
+            return URL(fileURLWithPath: override).appendingPathComponent("settings.json")
+        }
         let home = FileManager.default.homeDirectoryForCurrentUser
         return home.appendingPathComponent(".claude/settings.json")
     }

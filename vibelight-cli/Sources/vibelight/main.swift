@@ -45,6 +45,17 @@ func run(_ args: [String]) -> Int32 {
             FileHandle.standardOutput.write(Data("\n".utf8))
             return 0
 
+        case "install-hooks":
+            let binaryPath = "/usr/local/bin/vibelight"
+            try HookInstaller.install(settingsURL: Paths.claudeSettingsFile, binaryPath: binaryPath)
+            FileHandle.standardOutput.write(Data("Installed vibelight hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
+            return 0
+
+        case "uninstall-hooks":
+            try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
+            FileHandle.standardOutput.write(Data("Removed vibelight hooks from \(Paths.claudeSettingsFile.path)\n".utf8))
+            return 0
+
         default:
             FileHandle.standardError.write(
                 Data("Usage: vibelight <set|clear|status|install-hooks|uninstall-hooks>\n".utf8)

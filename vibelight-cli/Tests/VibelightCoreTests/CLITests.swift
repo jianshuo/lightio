@@ -52,6 +52,37 @@ final class CLITests: XCTestCase {
         XCTAssertTrue(result.stderr.contains("Usage"))
     }
 
+    func testInstallHooksPatchesSettingsFile() throws {
+        let fakeClaudeDir = tempDir.appendingPathComponent("dot-claude")
+        try FileManager.default.createDirectory(at: fakeClaudeDir, withIntermediateDirectories: true)
+        let settingsURL = fakeClaudeDir.appendingPathComponent("settings.json")
+
+        let result = try runCLI(
+            args: ["install-hooks"],
+            extraEnv: ["VIBELIGHT_CLAUDE_DIR": fakeClaudeDir.path]
+        )
+        XCTAssertEqual(result.exitCode, 0, "stderr=\(result.stderr)")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: settingsURL.path))
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        XCTAssertNotNil(hooks["UserPromptSubmit"])
+    }
+
+    func testUninstallHooksRemovesVibelightOnly() throws {
+        let fakeClaudeDir = tempDir.appendingPathComponent("dot-claude")
+        try FileManager.default.createDirectory(at: fakeClaudeDir, withIntermediateDirectories: true)
+        _ = try runCLI(args: ["install-hooks"], extraEnv: ["VIBELIGHT_CLAUDE_DIR": fakeClaudeDir.path])
+        _ = try runCLI(args: ["uninstall-hooks"], extraEnv: ["VIBELIGHT_CLAUDE_DIR": fakeClaudeDir.path])
+
+        let settingsURL = fakeClaudeDir.appendingPathComponent("settings.json")
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as? [String: Any] ?? [:]
+        XCTAssertNil(hooks["UserPromptSubmit"])
+    }
+
     // MARK: - Helpers
 
     private func cliBinary() -> URL {
@@ -72,14 +103,16 @@ final class CLITests: XCTestCase {
 
     private struct RunResult { let exitCode: Int32; let stdout: String; let stderr: String }
 
-    private func runCLI(args: [String], stdin: String? = nil) throws -> RunResult {
+    private func runCLI(args: [String], stdin: String? = nil, extraEnv: [String: String] = [:]) throws -> RunResult {
         let proc = Process()
         proc.executableURL = cliBinary()
         proc.arguments = args
-        proc.environment = [
+        var env: [String: String] = [
             "VIBELIGHT_STATE_DIR": tempDir.path,
             "PATH": ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin",
         ]
+        for (k, v) in extraEnv { env[k] = v }
+        proc.environment = env
         let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
         proc.standardInput = inPipe
         proc.standardOutput = outPipe
