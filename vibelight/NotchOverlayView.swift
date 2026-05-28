@@ -90,20 +90,67 @@ final class NotchOverlayView: NSView {
     // MARK: - State
 
     private func applyState(_ state: MergedState, animated: Bool) {
-        let color = Self.cgColor(for: state)
-        let lineOpacity: Float = (state == .idle) ? 0.15 : 1.0
-
+        let newColor = Self.cgColor(for: state)
+        let newOpacity: Float = (state == .idle) ? 0.15 : 1.0
+        let previousState = currentState
         currentState = state
 
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(animated ? 0.30 : 0)
-        glowLayer.shadowColor = color
-        outerGlowLayer.shadowColor = color
-        lineLayer.backgroundColor = color
-        lineLayer.opacity = lineOpacity
-        glowLayer.opacity = lineOpacity
-        outerGlowLayer.opacity = lineOpacity
-        CATransaction.commit()
+        // Reduce-motion users get an instant swap.
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let shouldPulse = animated && !reduceMotion && state != previousState
+
+        if !shouldPulse {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(animated ? 0.05 : 0)
+            glowLayer.shadowColor = newColor
+            outerGlowLayer.shadowColor = newColor
+            lineLayer.backgroundColor = newColor
+            glowLayer.opacity = newOpacity
+            outerGlowLayer.opacity = newOpacity
+            lineLayer.opacity = newOpacity
+            CATransaction.commit()
+            return
+        }
+
+        // Ding pulse: 0ms current → 150ms white → 350ms new color.
+        let whiteColor = NSColor.white.cgColor
+        for layer in [glowLayer, outerGlowLayer, lineLayer] {
+            let key = "ding-pulse"
+            layer.removeAnimation(forKey: key)
+
+            let property = (layer === lineLayer) ? "backgroundColor" : "shadowColor"
+            let anim = CAKeyframeAnimation(keyPath: property)
+            anim.duration = 0.35
+            anim.values = [
+                layer.presentation()?.value(forKeyPath: property) as Any,
+                whiteColor,
+                newColor as Any,
+            ]
+            anim.keyTimes = [0.0, 0.42, 1.0]
+            anim.timingFunctions = [
+                CAMediaTimingFunction(name: .easeOut),
+                CAMediaTimingFunction(name: .easeIn),
+            ]
+            anim.isRemovedOnCompletion = true
+            layer.add(anim, forKey: key)
+            layer.setValue(newColor, forKeyPath: property)
+        }
+
+        // Opacity transitions in parallel — fade-in of the new color over 350ms.
+        let opacityAnim = CABasicAnimation(keyPath: "opacity")
+        opacityAnim.duration = 0.35
+        opacityAnim.fromValue = max(glowLayer.opacity, 0.5)
+        opacityAnim.toValue = newOpacity
+        for layer in [glowLayer, outerGlowLayer, lineLayer] {
+            layer.opacity = newOpacity
+            layer.add(opacityAnim, forKey: "ding-opacity")
+        }
+    }
+
+    /// Force the view to a specific state without going through the publisher.
+    /// Used only for the startup self-test flash.
+    func previewState(_ state: MergedState) {
+        applyState(state, animated: true)
     }
 
     static func cgColor(for state: MergedState) -> CGColor {
