@@ -27,7 +27,7 @@ final class NotchOverlayView: NSView {
         var all: [CAShapeLayer] { [line, glow1, glow2, glow3, glow4, glow5] }
     }
     private var segments: [SegmentLayers] = []
-    private var currentStates: [SessionState] = []
+    private var currentStates: [MergedState] = []
     private var cachedPath: CGPath?
 
     init(notchSize: CGSize) {
@@ -40,7 +40,7 @@ final class NotchOverlayView: NSView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func bindSessions<P: Publisher>(_ publisher: P) where P.Output == [SessionState], P.Failure == Never {
+    func bindSessions<P: Publisher>(_ publisher: P) where P.Output == [MergedState], P.Failure == Never {
         publisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] states in self?.apply(states: states, animated: true) }
@@ -89,7 +89,7 @@ final class NotchOverlayView: NSView {
 
     // MARK: - Apply
 
-    private func apply(states: [SessionState], animated: Bool) {
+    private func apply(states: [MergedState], animated: Bool) {
         NSLog("cclight: apply states=\(states.map { $0.rawValue })")
 
         let effectiveCount = max(states.count, 1)
@@ -98,12 +98,7 @@ final class NotchOverlayView: NSView {
 
         for i in 0..<effectiveCount {
             let segment = segments[i]
-            let state: MergedState
-            if states.isEmpty {
-                state = .idle
-            } else {
-                state = (states[i] == .working) ? .working : .waiting
-            }
+            let state: MergedState = states.isEmpty ? .idle : states[i]
             let color = Self.cgColor(for: state)
             let opacity: Float = (state == .idle) ? 0.20 : 1.0
 
@@ -116,37 +111,46 @@ final class NotchOverlayView: NSView {
             }
             CATransaction.commit()
 
-            applyBreath(to: segment, working: state == .working)
+            applyBreath(to: segment, state: state)
         }
 
         currentStates = states
     }
 
-    /// Breathing halo: when a segment is `.working`, the soft outer glow
-    /// layers pulse 45%↔100% opacity. The crisp line layer stays steady so
-    /// the U-shape outline remains sharp — only the aura breathes.
+    /// Breathing halo: pulses the soft outer glow layers between 45% and 100%
+    /// opacity. The crisp line stays steady so the U-shape outline remains
+    /// sharp — only the aura breathes. `.working` uses a calm 1.8 s cadence;
+    /// `.attention` uses a faster 1.0 s cadence to convey urgency.
     ///
-    /// Idempotent: if the breath animation is already running we leave it
-    /// alone, so apply() being called on every StateStore publish doesn't
-    /// constantly reset the phase.
-    private func applyBreath(to segment: SegmentLayers, working: Bool) {
+    /// Idempotent: if the breath animation is already running with the same
+    /// cadence we leave it alone, so apply() being called on every StateStore
+    /// publish doesn't constantly reset the phase. We do reset if the cadence
+    /// needs to change (working → attention or vice versa).
+    private func applyBreath(to segment: SegmentLayers, state: MergedState) {
         let breathing = [segment.glow1, segment.glow2, segment.glow3, segment.glow4, segment.glow5]
-        if working {
-            guard breathing.first?.animation(forKey: "breath") == nil else { return }
-            let breath = CABasicAnimation(keyPath: "opacity")
-            breath.fromValue = 0.45
-            breath.toValue = 1.0
-            breath.duration = 1.8
-            breath.autoreverses = true
-            breath.repeatCount = .infinity
-            breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            for layer in breathing {
-                layer.add(breath, forKey: "breath")
-            }
-        } else {
-            for layer in breathing {
-                layer.removeAnimation(forKey: "breath")
-            }
+        let duration: CFTimeInterval?
+        switch state {
+        case .working:   duration = 1.8
+        case .attention: duration = 1.0
+        case .waiting, .idle: duration = nil
+        }
+        guard let duration = duration else {
+            for layer in breathing { layer.removeAnimation(forKey: "breath") }
+            return
+        }
+        if let existing = breathing.first?.animation(forKey: "breath") as? CABasicAnimation,
+           existing.duration == duration {
+            return
+        }
+        let breath = CABasicAnimation(keyPath: "opacity")
+        breath.fromValue = 0.45
+        breath.toValue = 1.0
+        breath.duration = duration
+        breath.autoreverses = true
+        breath.repeatCount = .infinity
+        breath.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        for layer in breathing {
+            layer.add(breath, forKey: "breath")
         }
     }
 
@@ -185,9 +189,13 @@ final class NotchOverlayView: NSView {
         guard let path = cachedPath else { return }
         let count = segments.count
         guard count > 0 else { return }
+        // The U-path is drawn clockwise starting at top-right, so strokeStart=0
+        // is the right end. Map segment 0 to the *left* end instead, so the
+        // visual order (left → right) matches the user's session-open order.
         for (i, segment) in segments.enumerated() {
-            let start = CGFloat(i) / CGFloat(count)
-            let end = CGFloat(i + 1) / CGFloat(count)
+            let reversed = count - 1 - i
+            let start = CGFloat(reversed) / CGFloat(count)
+            let end = CGFloat(reversed + 1) / CGFloat(count)
             for shape in segment.all {
                 shape.path = path
                 shape.frame = bounds
@@ -200,10 +208,7 @@ final class NotchOverlayView: NSView {
 
     /// Force the view to a specific state — used only for the startup self-test.
     func previewState(_ state: MergedState) {
-        let s: SessionState? = (state == .working) ? .working
-            : (state == .waiting) ? .waiting
-            : nil
-        apply(states: s.map { [$0] } ?? [], animated: true)
+        apply(states: state == .idle ? [] : [state], animated: true)
     }
 
     static func cgColor(for state: MergedState) -> CGColor {
@@ -214,6 +219,11 @@ final class NotchOverlayView: NSView {
         case .waiting:
             // Green — your turn, Claude ready.
             return NSColor(red: 95/255.0, green: 207/255.0, blue: 122/255.0, alpha: 1).cgColor
+        case .attention:
+            // Cyan-blue #4DA6FF — Claude paused for your input (Notification
+            // hook). Distinct from quiet "waiting" so the user knows it's
+            // actionable, not just done.
+            return NSColor(red: 77/255.0, green: 166/255.0, blue: 255/255.0, alpha: 1).cgColor
         case .idle:
             // White — fully done / inactive.
             return NSColor.white.cgColor

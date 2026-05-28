@@ -16,15 +16,17 @@ func run(_ args: [String]) -> Int32 {
             guard args.count >= 2,
                   let state = SessionState(rawValue: args[1])
             else {
-                FileHandle.standardError.write(Data("Usage: cclight set <working|waiting>\n".utf8))
+                FileHandle.standardError.write(Data("Usage: cclight set <working|waiting> [--reason <reason>]\n".utf8))
                 return 2
             }
+            let reason = parseReason(in: Array(args.dropFirst(2)))
             let input = try HookInputJSON.parse(readStdin())
             try StateFile.update { snapshot in
                 snapshot.sessions[input.sessionId] = StateSnapshot.SessionEntry(
                     state: state,
                     ts: Int(Date().timeIntervalSince1970),
-                    cwd: input.cwd
+                    cwd: input.cwd,
+                    reason: reason
                 )
             }
             return 0
@@ -46,7 +48,7 @@ func run(_ args: [String]) -> Int32 {
             return 0
 
         case "install-hooks":
-            let binaryPath = "/Applications/CCLight.app/Contents/Resources/cclight"
+            let binaryPath = "/Applications/CCLight.app/Contents/MacOS/cclightcli"
             try HookInstaller.install(settingsURL: Paths.claudeSettingsFile, binaryPath: binaryPath)
             FileHandle.standardOutput.write(Data("Installed cclight hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
             return 0
@@ -68,6 +70,11 @@ func run(_ args: [String]) -> Int32 {
     }
 }
 
+func parseReason(in args: [String]) -> HookReason? {
+    guard let idx = args.firstIndex(of: "--reason"), idx + 1 < args.count else { return nil }
+    return HookReason(rawValue: args[idx + 1])
+}
+
 func readStdin() -> Data {
     var buf = Data()
     let handle = FileHandle.standardInput
@@ -82,7 +89,8 @@ func readStdin() -> Data {
 func printUsage() {
     let msg = """
     Usage: cclight <command>
-      set <working|waiting>    Update this session's state (reads hook JSON from stdin)
+      set <working|waiting> [--reason <session-start|user-prompt|stop|notification>]
+                               Update this session's state (reads hook JSON from stdin)
       clear                    Remove this session (reads hook JSON from stdin)
       status                   Print current state.json
       install-hooks            Install cclight hooks into ~/.claude/settings.json

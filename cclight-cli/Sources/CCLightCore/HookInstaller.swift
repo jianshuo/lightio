@@ -4,12 +4,15 @@ public enum HookInstaller {
     /// Marker we embed in each command string so uninstall can find our hooks.
     public static let marker = "cclight"
 
-    /// Hook events cclight installs.
+    /// Hook events cclight installs. Each `set` call tags itself with
+    /// `--reason <event>` so the overlay can tell *why* a state changed —
+    /// e.g. `waiting/notification` (Claude paused for input) renders as
+    /// "attention" while `waiting/stop` is a quiet "done".
     static let hookEvents: [(event: String, args: String)] = [
-        ("SessionStart",     "set waiting"),
-        ("UserPromptSubmit", "set working"),
-        ("Stop",             "set waiting"),
-        ("Notification",     "set waiting"),
+        ("SessionStart",     "set waiting --reason \(HookReason.sessionStart.rawValue)"),
+        ("UserPromptSubmit", "set working --reason \(HookReason.userPrompt.rawValue)"),
+        ("Stop",             "set waiting --reason \(HookReason.stop.rawValue)"),
+        ("Notification",     "set waiting --reason \(HookReason.notification.rawValue)"),
         ("SessionEnd",       "clear"),
     ]
 

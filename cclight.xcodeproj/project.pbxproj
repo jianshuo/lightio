@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		D4D3F8612FC7FF63005965CA /* cclight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = cclight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4D3F8612FC7FF63005965CA /* cclight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = cclight.app; path = CCLight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -114,6 +114,16 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		D4D3F85F2FC7FF63005965CA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXShellScriptBuildPhase section */
 		A0000000000000000001B0F3 /* Embed cclight CLI */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -132,19 +142,9 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/cclight-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/cclightcli\" \"$DEST/cclight\"\nchmod +x \"$DEST/cclight\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$DEST/cclight\"\nfi\necho \"Embedded cclight CLI → $DEST/cclight\"\n";
+			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/cclight-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\n# Embed into Contents/MacOS/ so the kernel recognizes it as a code\n# location and lets the helper inherit the parent app's provisioning\n# profile (required for sandbox entitlements to validate at launch).\n# Name stays `cclightcli` to avoid case-insensitive APFS collision with\n# the parent app's MacOS/CCLight.\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/MacOS\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/cclightcli\" \"$DEST/cclightcli\"\nchmod +x \"$DEST/cclightcli\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none --entitlements \"$SRCROOT/cclight/cclight-cli.entitlements\" \"$DEST/cclightcli\"\nfi\n# Relocate the SwiftPM-generated dSYM so Xcode's archive step picks it\n# up with a UUID that matches the embedded binary.\nSRC_DSYM=\".build/arm64-apple-macosx/release/cclightcli.dSYM\"\nif [ -d \"$SRC_DSYM\" ] && [ -n \"${DWARF_DSYM_FOLDER_PATH:-}\" ]; then\n  OUT_DSYM=\"$DWARF_DSYM_FOLDER_PATH/cclightcli.dSYM\"\n  rm -rf \"$OUT_DSYM\"\n  cp -R \"$SRC_DSYM\" \"$OUT_DSYM\"\nfi\necho \"Embedded cclight CLI → $DEST/cclightcli\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXResourcesBuildPhase section */
-		D4D3F85F2FC7FF63005965CA /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D4D3F85D2FC7FF63005965CA /* Sources */ = {
@@ -285,14 +285,15 @@
 				CODE_SIGN_ENTITLEMENTS = cclight/cclight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 202605282324;
 				DEVELOPMENT_TEAM = 97XBW2A43H;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "CCLight";
+				INFOPLIST_KEY_CFBundleDisplayName = CCLight;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -320,14 +321,15 @@
 				CODE_SIGN_ENTITLEMENTS = cclight/cclight.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 202605282324;
 				DEVELOPMENT_TEAM = 97XBW2A43H;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "CCLight";
+				INFOPLIST_KEY_CFBundleDisplayName = CCLight;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (

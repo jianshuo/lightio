@@ -99,6 +99,27 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertEqual(proc.terminationStatus, 0, "missing-binary hook must no-op cleanly")
     }
 
+    func testInstalledCommandTagsEachEventWithReason() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/cclight")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+
+        func command(forEvent event: String) -> String {
+            let entries = hooks[event] as! [[String: Any]]
+            let inner = entries[0]["hooks"] as! [[String: Any]]
+            return inner[0]["command"] as! String
+        }
+
+        XCTAssertTrue(command(forEvent: "SessionStart").contains("--reason session-start"))
+        XCTAssertTrue(command(forEvent: "UserPromptSubmit").contains("--reason user-prompt"))
+        XCTAssertTrue(command(forEvent: "Stop").contains("--reason stop"))
+        XCTAssertTrue(command(forEvent: "Notification").contains("--reason notification"))
+        // SessionEnd is `clear` — no reason needed.
+        XCTAssertFalse(command(forEvent: "SessionEnd").contains("--reason"))
+    }
+
     func testUninstallRemovesCCLightHooksKeepsOthers() throws {
         let existing = """
         {

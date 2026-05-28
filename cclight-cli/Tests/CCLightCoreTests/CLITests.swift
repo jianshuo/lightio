@@ -29,6 +29,27 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(snapshot.sessions["abc-123"]?.cwd, "/tmp/foo")
     }
 
+    func testSetWithReasonFlagPersistsReason() throws {
+        let payload = #"{"session_id":"n1","cwd":"/tmp/n"}"#
+        let result = try runCLI(args: ["set", "waiting", "--reason", "notification"], stdin: payload)
+        XCTAssertEqual(result.exitCode, 0, "stderr=\(result.stderr)")
+
+        setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
+        defer { unsetenv("VIBELIGHT_STATE_DIR") }
+        let snapshot = try StateFile.read()
+        XCTAssertEqual(snapshot.sessions["n1"]?.state, .waiting)
+        XCTAssertEqual(snapshot.sessions["n1"]?.reason, .notification)
+    }
+
+    func testSetWithoutReasonFlagLeavesReasonNil() throws {
+        let payload = #"{"session_id":"u1"}"#
+        _ = try runCLI(args: ["set", "working"], stdin: payload)
+        setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
+        defer { unsetenv("VIBELIGHT_STATE_DIR") }
+        let snapshot = try StateFile.read()
+        XCTAssertNil(snapshot.sessions["u1"]?.reason)
+    }
+
     func testClearRemovesSession() throws {
         _ = try runCLI(args: ["set", "working"], stdin: #"{"session_id":"x"}"#)
         _ = try runCLI(args: ["clear"], stdin: #"{"session_id":"x"}"#)

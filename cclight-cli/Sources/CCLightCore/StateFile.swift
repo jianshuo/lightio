@@ -9,11 +9,13 @@ public struct StateSnapshot: Codable, Equatable, Sendable {
         public var state: SessionState
         public var ts: Int
         public var cwd: String?
+        public var reason: HookReason?
 
-        public init(state: SessionState, ts: Int, cwd: String?) {
+        public init(state: SessionState, ts: Int, cwd: String?, reason: HookReason? = nil) {
             self.state = state
             self.ts = ts
             self.cwd = cwd
+            self.reason = reason
         }
     }
 

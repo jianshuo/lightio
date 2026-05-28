@@ -19,7 +19,10 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(MergedState.merge([]), .idle)
     }
 
-    func testMergedStateOrderingIsWorkingGreaterThanWaitingGreaterThanIdle() {
+    func testMergedStatePriorityOrdering() {
+        // attention outranks working so a "needs you" signal isn't drowned out
+        // by another session still running.
+        XCTAssertGreaterThan(MergedState.attention.priority, MergedState.working.priority)
         XCTAssertGreaterThan(MergedState.working.priority, MergedState.waiting.priority)
         XCTAssertGreaterThan(MergedState.waiting.priority, MergedState.idle.priority)
     }
@@ -38,5 +41,33 @@ final class SessionStateTests: XCTestCase {
 
         let empty = StateSnapshot()
         XCTAssertEqual(MergedState.merge(snapshot: empty), .idle)
+    }
+
+    func testHookReasonRawValuesAreStable() {
+        XCTAssertEqual(HookReason.sessionStart.rawValue, "session-start")
+        XCTAssertEqual(HookReason.userPrompt.rawValue, "user-prompt")
+        XCTAssertEqual(HookReason.stop.rawValue, "stop")
+        XCTAssertEqual(HookReason.notification.rawValue, "notification")
+    }
+
+    func testMergedStateForEntryPromotesNotificationToAttention() {
+        let waitingStop = StateSnapshot.SessionEntry(state: .waiting, ts: 1, cwd: nil, reason: .stop)
+        XCTAssertEqual(MergedState.mergedState(for: waitingStop), .waiting)
+
+        let waitingNotif = StateSnapshot.SessionEntry(state: .waiting, ts: 1, cwd: nil, reason: .notification)
+        XCTAssertEqual(MergedState.mergedState(for: waitingNotif), .attention)
+
+        // working ignores reason entirely.
+        let workingNotif = StateSnapshot.SessionEntry(state: .working, ts: 1, cwd: nil, reason: .notification)
+        XCTAssertEqual(MergedState.mergedState(for: workingNotif), .working)
+    }
+
+    func testMergeFromSnapshotWithNotificationYieldsAttention() {
+        let snapshot = StateSnapshot(sessions: [
+            "a": .init(state: .working, ts: 1, cwd: nil, reason: .userPrompt),
+            "b": .init(state: .waiting, ts: 2, cwd: nil, reason: .notification),
+        ])
+        // Attention outranks working — Claude paused for input takes priority.
+        XCTAssertEqual(MergedState.merge(snapshot: snapshot), .attention)
     }
 }

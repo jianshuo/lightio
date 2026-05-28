@@ -66,4 +66,29 @@ final class StateFileTests: XCTestCase {
         XCTAssertEqual(reloaded.sessions["a"]?.state, .working)
         XCTAssertEqual(reloaded.sessions["b"]?.state, .waiting)
     }
+
+    func testRoundTripPreservesReason() throws {
+        let original = StateSnapshot(sessions: [
+            "sess-n": StateSnapshot.SessionEntry(
+                state: .waiting, ts: 1_700_000_000, cwd: nil, reason: .notification
+            ),
+        ])
+        try StateFile.write(original)
+        let reloaded = try StateFile.read()
+        XCTAssertEqual(reloaded.sessions["sess-n"]?.reason, .notification)
+    }
+
+    func testReadOldStateJSONWithoutReasonField() throws {
+        // Simulate an entry written by a pre-reason cclight binary — reason
+        // key absent. Optional decoding must default it to nil, not throw.
+        let legacy = #"""
+        {"version":1,"sessions":{"s":{"state":"waiting","ts":1700000000,"cwd":"/tmp"}}}
+        """#
+        try FileManager.default.createDirectory(at: Paths.stateDir, withIntermediateDirectories: true)
+        try legacy.data(using: .utf8)!.write(to: Paths.stateFile)
+
+        let reloaded = try StateFile.read()
+        XCTAssertEqual(reloaded.sessions["s"]?.state, .waiting)
+        XCTAssertNil(reloaded.sessions["s"]?.reason)
+    }
 }

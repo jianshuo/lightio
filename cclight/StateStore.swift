@@ -13,9 +13,11 @@ final class StateStore: ObservableObject {
     /// Active session count (for menu display).
     @Published private(set) var sessionCount: Int = 0
 
-    /// Per-session states (capped at 4 most-recent), sorted by session_id for
-    /// stable ordering. NotchOverlayView uses this to render one halo per session.
-    @Published private(set) var orderedSessionStates: [SessionState] = []
+    /// Per-session presentation states (capped at 4 most-recent), sorted by
+    /// session_id for stable ordering. Each entry has already been folded with
+    /// its `reason` so e.g. `waiting/notification` arrives as `.attention`.
+    /// NotchOverlayView and the menu both render from this.
+    @Published private(set) var orderedSessionStates: [MergedState] = []
 
     /// Session IDs parallel to orderedSessionStates, for menu display.
     @Published private(set) var orderedSessionIds: [String] = []
@@ -101,7 +103,7 @@ final class StateStore: ObservableObject {
             .prefix(4)
         sessionCount = topSessions.count
         let sortedTop = topSessions.sorted { $0.key < $1.key }
-        orderedSessionStates = sortedTop.map { $0.value.state }
+        orderedSessionStates = sortedTop.map { MergedState.mergedState(for: $0.value) }
         orderedSessionIds = sortedTop.map { $0.key }
         orderedSessionCwds = sortedTop.map { $0.value.cwd }
 
@@ -112,6 +114,11 @@ final class StateStore: ObservableObject {
         switch merged {
         case .working:
             currentState = .working
+        case .attention:
+            // No idle timer: a "Claude needs you" signal should persist until
+            // the user actually responds (next hook event clears it) or the
+            // session entry ages out (>10min) via the prune above.
+            currentState = .attention
         case .waiting:
             currentState = .waiting
             startIdleTimer()
@@ -125,6 +132,8 @@ final class StateStore: ObservableObject {
         timer.schedule(deadline: .now() + idleTimeout)
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
+            // Only demote from waiting → idle. Working/attention should never
+            // be silently downgraded by a timer.
             if self.currentState == .waiting {
                 self.currentState = .idle
             }

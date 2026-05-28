@@ -45,9 +45,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let image = NSImage(size: size, flipped: false) { rect in
             let dotRect = NSRect(x: 3, y: 3, width: 8, height: 8)
             switch state {
-            case .working: NSColor(red: 255/255, green: 176/255, blue: 0/255, alpha: 1).setFill()
-            case .waiting: NSColor(red: 95/255, green: 207/255, blue: 122/255, alpha: 1).setFill()
-            case .idle:    NSColor.white.setFill()
+            case .working:   NSColor(red: 255/255, green: 176/255, blue: 0/255, alpha: 1).setFill()
+            case .waiting:   NSColor(red: 95/255, green: 207/255, blue: 122/255, alpha: 1).setFill()
+            case .attention: NSColor(red: 77/255, green: 166/255, blue: 255/255, alpha: 1).setFill()
+            case .idle:      NSColor.white.setFill()
             }
             NSBezierPath(ovalIn: dotRect).fill()
             return true
@@ -82,7 +83,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(header)
             for (i, state) in states.enumerated() {
                 let name = Self.displayName(cwd: cwds[safe: i] ?? nil, id: ids[safe: i])
-                let label = "\(name) — \(state == .working ? "working" : "waiting")"
+                let label = "\(name) — \(Self.label(for: state))"
                 let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
                 item.isEnabled = false
                 item.image = Self.dotImage(forSessionState: state)
@@ -140,14 +141,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return String(id?.prefix(8) ?? "?")
     }
 
-    private static func dotImage(forSessionState state: SessionState) -> NSImage {
+    private static func dotImage(forSessionState state: MergedState) -> NSImage {
         let size = NSSize(width: 12, height: 12)
         let image = NSImage(size: size, flipped: false) { _ in
             let dotRect = NSRect(x: 2, y: 2, width: 8, height: 8)
+            // Use the same palette as the notch glow so the menu reads as
+            // the same status surface.
             switch state {
             case .working:
-                NSColor(red: 245/255, green: 166/255, blue: 35/255, alpha: 1).setFill()
+                NSColor(red: 255/255, green: 176/255, blue: 0/255, alpha: 1).setFill()
             case .waiting:
+                NSColor(red: 95/255, green: 207/255, blue: 122/255, alpha: 1).setFill()
+            case .attention:
+                NSColor(red: 77/255, green: 166/255, blue: 255/255, alpha: 1).setFill()
+            case .idle:
                 NSColor.white.setFill()
             }
             NSBezierPath(ovalIn: dotRect).fill()
@@ -155,6 +162,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         image.isTemplate = false
         return image
+    }
+
+    private static func label(for state: MergedState) -> String {
+        switch state {
+        case .working:   return "working"
+        case .waiting:   return "waiting"
+        case .attention: return "needs you"
+        case .idle:      return "idle"
+        }
     }
 
     // MARK: - Actions
