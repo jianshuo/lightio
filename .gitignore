@@ -4,3 +4,8 @@ build/
 DerivedData/
 xcuserdata/
 *.xcuserstate
+
+# SwiftPM
+vibelight-cli/.build/
+vibelight-cli/.swiftpm/
+vibelight-cli/Package.resolved
