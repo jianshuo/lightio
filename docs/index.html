@@ -370,6 +370,42 @@
     .hero-meta .sep { color: var(--ink-4); }
 
     /* ─────────────────────────────────────────────
+       demo (landscape promo video)
+    ────────────────────────────────────────────── */
+    section.demo {
+      padding-block: 96px;
+      border-top: 1px solid var(--hairline);
+    }
+    .demo-frame {
+      max-width: 1080px;
+      margin: 0 auto;
+      border: 1px solid var(--hairline);
+      background: #000;
+      overflow: hidden;
+      position: relative;
+    }
+    .demo-frame video {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .demo-frame figcaption {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      padding: 18px 24px;
+      border-top: 1px solid var(--hairline);
+      text-align: center;
+      background: rgba(10, 10, 11, 0.6);
+    }
+    .demo-frame figcaption strong {
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+
+    /* ─────────────────────────────────────────────
        states section
     ────────────────────────────────────────────── */
     section.states {
@@ -865,7 +901,7 @@
       .hooks-table { grid-template-columns: 140px 1fr; font-size: 12px; }
       nav.top .links a:not(.cta) { display: none; }
       .hero { padding-top: 64px; padding-bottom: 72px; }
-      section.states, section.multi, section.specs { padding-block: 80px; }
+      section.demo, section.states, section.multi, section.specs { padding-block: 64px; }
       section.cta { padding-block: 96px; }
       .notch { width: 280px; }
       .multi-stage { padding: 36px 16px 32px; }
@@ -956,11 +992,34 @@
     </div>
   </header>
 
+  <!-- ─────────────── DEMO ─────────────── -->
+  <section class="demo">
+    <div class="wrap">
+      <div class="section-label reveal">
+        <span class="num">01</span><span>See it in motion</span><span class="bar"></span>
+      </div>
+      <figure class="demo-frame reveal" data-delay="1" style="margin: 0;">
+        <video
+          src="cclight-promo-landscape.mp4"
+          muted
+          autoplay
+          loop
+          playsinline
+          preload="metadata"
+          aria-label="CCLight running on a MacBook — the notch glows amber while Claude works, green when it's your turn."
+        ></video>
+        <figcaption>
+          <strong>Amber</strong> while Claude thinks. <strong>Green</strong> when it's your turn. <strong>Dim white</strong> when you've walked away.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
   <!-- ─────────────── STATES ─────────────── -->
   <section class="states" id="states">
     <div class="wrap">
       <div class="section-label reveal">
-        <span class="num">01</span><span>The three colors</span><span class="bar"></span>
+        <span class="num">02</span><span>The three colors</span><span class="bar"></span>
       </div>
 
       <div class="states-intro">
@@ -1006,7 +1065,7 @@
   <section class="multi" id="multi">
     <div class="wrap">
       <div class="section-label reveal">
-        <span class="num">02</span><span>Many sessions, one glance</span><span class="bar"></span>
+        <span class="num">03</span><span>Many sessions, one glance</span><span class="bar"></span>
       </div>
 
       <div class="multi-head">
@@ -1048,7 +1107,7 @@
   <section class="why">
     <div class="wrap">
       <div class="section-label reveal">
-        <span class="num">03</span><span>Why this exists</span><span class="bar"></span>
+        <span class="num">04</span><span>Why this exists</span><span class="bar"></span>
       </div>
 
       <div class="why-grid">
@@ -1078,7 +1137,7 @@
   <section class="specs" id="tech">
     <div class="wrap">
       <div class="section-label reveal">
-        <span class="num">04</span><span>Under the hood</span><span class="bar"></span>
+        <span class="num">05</span><span>Under the hood</span><span class="bar"></span>
       </div>
 
       <h2 class="reveal">
