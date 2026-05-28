@@ -29,4 +29,9 @@ public enum MergedState: String, Sendable, Equatable {
             return candidate.priority > acc.priority ? candidate : acc
         }
     }
+
+    /// Convenience: derive the merged state directly from a state.json snapshot.
+    public static func merge(snapshot: StateSnapshot) -> MergedState {
+        merge(snapshot.sessions.values.map { $0.state })
+    }
 }
