@@ -1,24 +1,24 @@
-# Vibelight V1 Implementation Plan
+# Lightio V1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship V1 of vibelight — a macOS menu-bar app that turns the MacBook notch into an ambient Claude Code status indicator, plus a `vibelight` CLI that Claude Code hooks call to drive the state.
+**Goal:** Ship V1 of lightio — a macOS menu-bar app that turns the MacBook notch into an ambient Claude Code status indicator, plus a `lightio` CLI that Claude Code hooks call to drive the state.
 
-**Architecture:** Two artifacts in one repo. A SwiftPM package `vibelight-cli/` produces both a shared `VibelightCore` library (state file I/O, hook payload parsing, hook installer) and the `vibelight` CLI binary. The existing `vibelight.xcodeproj` Xcode app target depends on `VibelightCore` as a local SwiftPM package, embeds the CLI binary in its `Contents/Resources/`, runs as a menu-bar agent (LSUIElement), watches `~/.vibelight/state.json` via FSEvents, and renders a transparent borderless `NSWindow` under the notch.
+**Architecture:** Two artifacts in one repo. A SwiftPM package `lightio-cli/` produces both a shared `LightioCore` library (state file I/O, hook payload parsing, hook installer) and the `lightio` CLI binary. The existing `lightio.xcodeproj` Xcode app target depends on `LightioCore` as a local SwiftPM package, embeds the CLI binary in its `Contents/Resources/`, runs as a menu-bar agent (LSUIElement), watches `~/.lightio/state.json` via FSEvents, and renders a transparent borderless `NSWindow` under the notch.
 
 **Tech Stack:** Swift 5.9+, SwiftUI scaffold + AppKit (NSWindow, NSStatusItem, CALayer, CoreServices/FSEvents), Foundation, XCTest, SwiftPM. Target macOS 14 (Sonoma).
 
-**Spec:** [docs/superpowers/specs/2026-05-28-vibelight-design.md](../specs/2026-05-28-vibelight-design.md)
+**Spec:** [docs/superpowers/specs/2026-05-28-lightio-design.md](../specs/2026-05-28-lightio-design.md)
 
 ---
 
 ## File Structure
 
 ```
-vibelight/
-├── vibelight.xcodeproj/           (existing, will reference local package)
-├── vibelight/                     (app target sources, auto-synced)
-│   ├── vibelightApp.swift         (modify — switch to AppDelegate adaptor)
+lightio/
+├── lightio.xcodeproj/           (existing, will reference local package)
+├── lightio/                     (app target sources, auto-synced)
+│   ├── lightioApp.swift         (modify — switch to AppDelegate adaptor)
 │   ├── ContentView.swift          (delete — no main window)
 │   ├── AppDelegate.swift          (new — owns top-level controllers)
 │   ├── StateStore.swift           (new — FSEvents + merge + idle timer)
@@ -27,19 +27,19 @@ vibelight/
 │   ├── NotchOverlayView.swift     (new — CALayer rendering)
 │   ├── MenuBarController.swift    (new — NSStatusItem + menu)
 │   └── FirstRun.swift             (new — symlink + hooks + login-item dialogs)
-├── vibelight-cli/                 (new SwiftPM package)
+├── lightio-cli/                 (new SwiftPM package)
 │   ├── Package.swift
 │   ├── Sources/
-│   │   ├── VibelightCore/
+│   │   ├── LightioCore/
 │   │   │   ├── SessionState.swift
 │   │   │   ├── StateFile.swift
 │   │   │   ├── HookInputJSON.swift
 │   │   │   ├── HookInstaller.swift
 │   │   │   └── Paths.swift
-│   │   └── vibelight/             (CLI executable)
+│   │   └── lightio/             (CLI executable)
 │   │       └── main.swift
 │   └── Tests/
-│       └── VibelightCoreTests/
+│       └── LightioCoreTests/
 │           ├── StateFileTests.swift
 │           ├── HookInputJSONTests.swift
 │           ├── HookInstallerTests.swift
@@ -47,49 +47,49 @@ vibelight/
 └── docs/superpowers/{specs,plans}/...
 ```
 
-**Why split this way:** The CLI must be invokable independently (Claude Code hooks call it from any cwd), so it lives in SwiftPM where it builds and tests as a standalone command. The app depends on the same `VibelightCore` library for shared types (`SessionState`, file IO) so the two halves of the system can never drift out of sync.
+**Why split this way:** The CLI must be invokable independently (Claude Code hooks call it from any cwd), so it lives in SwiftPM where it builds and tests as a standalone command. The app depends on the same `LightioCore` library for shared types (`SessionState`, file IO) so the two halves of the system can never drift out of sync.
 
 ---
 
 ## Task 1: Project setup — SwiftPM package, Xcode dependency, build phase
 
 **Files:**
-- Create: `vibelight-cli/Package.swift`
-- Create: `vibelight-cli/Sources/VibelightCore/.gitkeep`
-- Create: `vibelight-cli/Sources/vibelight/main.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/SmokeTest.swift`
+- Create: `lightio-cli/Package.swift`
+- Create: `lightio-cli/Sources/LightioCore/.gitkeep`
+- Create: `lightio-cli/Sources/lightio/main.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/SmokeTest.swift`
 - Modify: `.gitignore`
 - Manual Xcode work: add local package dep, add Run Script build phase
 
 - [ ] **Step 1: Create the SwiftPM manifest**
 
-Create `vibelight-cli/Package.swift`:
+Create `lightio-cli/Package.swift`:
 
 ```swift
 // swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
-    name: "vibelight-cli",
+    name: "lightio-cli",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "VibelightCore", targets: ["VibelightCore"]),
-        .executable(name: "vibelight", targets: ["vibelight"]),
+        .library(name: "LightioCore", targets: ["LightioCore"]),
+        .executable(name: "lightio", targets: ["lightio"]),
     ],
     targets: [
         .target(
-            name: "VibelightCore",
-            path: "Sources/VibelightCore"
+            name: "LightioCore",
+            path: "Sources/LightioCore"
         ),
         .executableTarget(
-            name: "vibelight",
-            dependencies: ["VibelightCore"],
-            path: "Sources/vibelight"
+            name: "lightio",
+            dependencies: ["LightioCore"],
+            path: "Sources/lightio"
         ),
         .testTarget(
-            name: "VibelightCoreTests",
-            dependencies: ["VibelightCore"],
-            path: "Tests/VibelightCoreTests"
+            name: "LightioCoreTests",
+            dependencies: ["LightioCore"],
+            path: "Tests/LightioCoreTests"
         ),
     ]
 )
@@ -97,24 +97,24 @@ let package = Package(
 
 - [ ] **Step 2: Create placeholder CLI entry**
 
-Create `vibelight-cli/Sources/vibelight/main.swift`:
+Create `lightio-cli/Sources/lightio/main.swift`:
 
 ```swift
 import Foundation
 
-print("vibelight (stub)")
+print("lightio (stub)")
 exit(0)
 ```
 
-Create `vibelight-cli/Sources/VibelightCore/.gitkeep` (empty file — SwiftPM needs the directory to exist).
+Create `lightio-cli/Sources/LightioCore/.gitkeep` (empty file — SwiftPM needs the directory to exist).
 
 - [ ] **Step 3: Create a smoke test so the test target compiles**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/SmokeTest.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/SmokeTest.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
 final class SmokeTest: XCTestCase {
     func testCanImportModule() {
@@ -127,35 +127,35 @@ final class SmokeTest: XCTestCase {
 
 Run:
 ```bash
-cd /Users/jianshuo/code/vibelight/vibelight-cli
+cd /Users/jianshuo/code/lightio/lightio-cli
 swift build
 swift test
 ```
 
 Expected:
-- `swift build` succeeds and produces `.build/debug/vibelight`.
+- `swift build` succeeds and produces `.build/debug/lightio`.
 - `swift test` reports `1 test passed`.
 
 - [ ] **Step 5: Extend .gitignore for SwiftPM and Xcode build artifacts**
 
-Edit `/Users/jianshuo/code/vibelight/.gitignore`. After existing contents, append:
+Edit `/Users/jianshuo/code/lightio/.gitignore`. After existing contents, append:
 
 ```
 # SwiftPM
-vibelight-cli/.build/
-vibelight-cli/.swiftpm/
-vibelight-cli/Package.resolved
+lightio-cli/.build/
+lightio-cli/.swiftpm/
+lightio-cli/Package.resolved
 ```
 
 - [ ] **Step 6: Add the local SwiftPM package as an Xcode dependency**
 
-This is Xcode UI work, no code to write. Open `vibelight.xcodeproj` in Xcode, then:
+This is Xcode UI work, no code to write. Open `lightio.xcodeproj` in Xcode, then:
 
-1. Select the project root in the navigator → `vibelight` project (not the target) → "Package Dependencies" tab → click `+`.
+1. Select the project root in the navigator → `lightio` project (not the target) → "Package Dependencies" tab → click `+`.
 2. In the dialog click "Add Local..." (bottom-left button).
-3. Choose the folder `vibelight-cli` and click "Add Package".
-4. In the next dialog, ensure the `VibelightCore` library is added to the `vibelight` app target. Click "Add Package".
-5. Build the app target (⌘B). It should still build the SwiftUI scaffold but now linked against `VibelightCore`.
+3. Choose the folder `lightio-cli` and click "Add Package".
+4. In the next dialog, ensure the `LightioCore` library is added to the `lightio` app target. Click "Add Package".
+5. Build the app target (⌘B). It should still build the SwiftUI scaffold but now linked against `LightioCore`.
 
 If Xcode complains about Package.resolved, that file is auto-generated and was intentionally gitignored in Step 5.
 
@@ -163,34 +163,34 @@ If Xcode complains about Package.resolved, that file is auto-generated and was i
 
 Still in Xcode:
 
-1. Select `vibelight` target → "Build Phases" tab.
+1. Select `lightio` target → "Build Phases" tab.
 2. Click `+` (top-left of the Build Phases pane) → "New Run Script Phase".
-3. Rename the new phase to "Embed vibelight CLI" (double-click the title).
+3. Rename the new phase to "Embed lightio CLI" (double-click the title).
 4. Drag the phase to be **after** "Copy Bundle Resources" but before any "Sign" phase.
 5. Uncheck "Based on dependency analysis" (we want this to always run).
 6. Paste this script into the body:
 
 ```bash
 set -euo pipefail
-CLI_DIR="$SRCROOT/vibelight-cli"
+CLI_DIR="$SRCROOT/lightio-cli"
 
 cd "$CLI_DIR"
 swift build -c release --arch arm64 --disable-sandbox
 
 DEST="$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources"
 mkdir -p "$DEST"
-cp ".build/arm64-apple-macosx/release/vibelight" "$DEST/vibelight"
-chmod +x "$DEST/vibelight"
-echo "Embedded vibelight CLI → $DEST/vibelight"
+cp ".build/arm64-apple-macosx/release/lightio" "$DEST/lightio"
+chmod +x "$DEST/lightio"
+echo "Embedded lightio CLI → $DEST/lightio"
 ```
 
 - [ ] **Step 8: Build the app to verify the CLI gets embedded**
 
-In Xcode, ⌘B to build the app target. The build log should show "Embedded vibelight CLI → …".
+In Xcode, ⌘B to build the app target. The build log should show "Embedded lightio CLI → …".
 
 Then inspect:
 ```bash
-ls -l ~/Library/Developer/Xcode/DerivedData/vibelight-*/Build/Products/Debug/vibelight.app/Contents/Resources/vibelight
+ls -l ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app/Contents/Resources/lightio
 ```
 
 Expected: the file exists and is executable (~3 MB Swift binary).
@@ -198,29 +198,29 @@ Expected: the file exists and is executable (~3 MB Swift binary).
 - [ ] **Step 9: Commit**
 
 ```bash
-cd /Users/jianshuo/code/vibelight
-git add vibelight-cli .gitignore vibelight.xcodeproj
+cd /Users/jianshuo/code/lightio
+git add lightio-cli .gitignore lightio.xcodeproj
 git commit -m "Scaffold SwiftPM CLI package and embed-on-build phase"
 ```
 
-Note: `vibelight.xcodeproj` changed because Xcode wrote package-reference and build-phase entries into `project.pbxproj`. That's expected.
+Note: `lightio.xcodeproj` changed because Xcode wrote package-reference and build-phase entries into `project.pbxproj`. That's expected.
 
 ---
 
 ## Task 2: SessionState model + Paths helper
 
 **Files:**
-- Create: `vibelight-cli/Sources/VibelightCore/SessionState.swift`
-- Create: `vibelight-cli/Sources/VibelightCore/Paths.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift`
+- Create: `lightio-cli/Sources/LightioCore/SessionState.swift`
+- Create: `lightio-cli/Sources/LightioCore/Paths.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift`
 
 - [ ] **Step 1: Write the failing test for SessionState codable round-trip and merge**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
 final class SessionStateTests: XCTestCase {
     func testRawValuesAreStable() {
@@ -250,7 +250,7 @@ final class SessionStateTests: XCTestCase {
 - [ ] **Step 2: Run the test to confirm it fails to compile**
 
 ```bash
-cd /Users/jianshuo/code/vibelight/vibelight-cli
+cd /Users/jianshuo/code/lightio/lightio-cli
 swift test --filter SessionStateTests
 ```
 
@@ -258,7 +258,7 @@ Expected: build error — `SessionState`, `MergedState` not defined.
 
 - [ ] **Step 3: Implement SessionState and MergedState**
 
-Create `vibelight-cli/Sources/VibelightCore/SessionState.swift`:
+Create `lightio-cli/Sources/LightioCore/SessionState.swift`:
 
 ```swift
 import Foundation
@@ -305,20 +305,20 @@ Expected: all 4 tests pass.
 
 - [ ] **Step 5: Implement Paths helper**
 
-Create `vibelight-cli/Sources/VibelightCore/Paths.swift`:
+Create `lightio-cli/Sources/LightioCore/Paths.swift`:
 
 ```swift
 import Foundation
 
-/// Resolves the paths vibelight reads/writes. Honors `VIBELIGHT_STATE_DIR`
-/// for tests so we never touch the user's real `~/.vibelight`.
+/// Resolves the paths lightio reads/writes. Honors `VIBELIGHT_STATE_DIR`
+/// for tests so we never touch the user's real `~/.lightio`.
 public enum Paths {
     public static var stateDir: URL {
         if let override = ProcessInfo.processInfo.environment["VIBELIGHT_STATE_DIR"] {
             return URL(fileURLWithPath: override)
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent(".vibelight", isDirectory: true)
+        return home.appendingPathComponent(".lightio", isDirectory: true)
     }
 
     public static var stateFile: URL {
@@ -335,9 +335,9 @@ public enum Paths {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/SessionState.swift \
-        vibelight-cli/Sources/VibelightCore/Paths.swift \
-        vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift
+git add lightio-cli/Sources/LightioCore/SessionState.swift \
+        lightio-cli/Sources/LightioCore/Paths.swift \
+        lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift
 git commit -m "Add SessionState + MergedState + Paths"
 ```
 
@@ -346,23 +346,23 @@ git commit -m "Add SessionState + MergedState + Paths"
 ## Task 3: StateFile — atomic JSON read/write
 
 **Files:**
-- Create: `vibelight-cli/Sources/VibelightCore/StateFile.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/StateFileTests.swift`
+- Create: `lightio-cli/Sources/LightioCore/StateFile.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/StateFileTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/StateFileTests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/StateFileTests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
 final class StateFileTests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("vibelight-tests-\(UUID().uuidString)")
+            .appendingPathComponent("lightio-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         setenv("VIBELIGHT_STATE_DIR", tempDir.path, 1)
     }
@@ -436,12 +436,12 @@ Expected: build error — `StateSnapshot`, `StateFile` not defined.
 
 - [ ] **Step 3: Implement StateSnapshot + StateFile**
 
-Create `vibelight-cli/Sources/VibelightCore/StateFile.swift`:
+Create `lightio-cli/Sources/LightioCore/StateFile.swift`:
 
 ```swift
 import Foundation
 
-/// In-memory representation of `~/.vibelight/state.json`.
+/// In-memory representation of `~/.lightio/state.json`.
 public struct StateSnapshot: Codable, Equatable, Sendable {
     public var version: Int
     public var sessions: [String: SessionEntry]
@@ -476,7 +476,7 @@ public enum StateFile {
             if data.isEmpty { return StateSnapshot() }
             return try JSONDecoder().decode(StateSnapshot.self, from: data)
         } catch {
-            FileHandle.standardError.write(Data("vibelight: malformed state.json: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("lightio: malformed state.json: \(error)\n".utf8))
             return StateSnapshot()
         }
     }
@@ -520,8 +520,8 @@ Expected: all 5 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/StateFile.swift \
-        vibelight-cli/Tests/VibelightCoreTests/StateFileTests.swift
+git add lightio-cli/Sources/LightioCore/StateFile.swift \
+        lightio-cli/Tests/LightioCoreTests/StateFileTests.swift
 git commit -m "Add StateFile with atomic write and tests"
 ```
 
@@ -530,16 +530,16 @@ git commit -m "Add StateFile with atomic write and tests"
 ## Task 4: HookInputJSON — parse Claude Code's stdin payload
 
 **Files:**
-- Create: `vibelight-cli/Sources/VibelightCore/HookInputJSON.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/HookInputJSONTests.swift`
+- Create: `lightio-cli/Sources/LightioCore/HookInputJSON.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/HookInputJSONTests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
 final class HookInputJSONTests: XCTestCase {
     func testParsesFullPayload() throws {
@@ -588,7 +588,7 @@ Expected: build error.
 
 - [ ] **Step 3: Implement HookInputJSON**
 
-Create `vibelight-cli/Sources/VibelightCore/HookInputJSON.swift`:
+Create `lightio-cli/Sources/LightioCore/HookInputJSON.swift`:
 
 ```swift
 import Foundation
@@ -627,8 +627,8 @@ Expected: 4 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/HookInputJSON.swift \
-        vibelight-cli/Tests/VibelightCoreTests/HookInputJSONTests.swift
+git add lightio-cli/Sources/LightioCore/HookInputJSON.swift \
+        lightio-cli/Tests/LightioCoreTests/HookInputJSONTests.swift
 git commit -m "Add permissive HookInputJSON parser"
 ```
 
@@ -637,25 +637,25 @@ git commit -m "Add permissive HookInputJSON parser"
 ## Task 5: CLI commands `set` / `clear` / `status`
 
 **Files:**
-- Modify: `vibelight-cli/Sources/vibelight/main.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/CLITests.swift`
+- Modify: `lightio-cli/Sources/lightio/main.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/CLITests.swift`
 
 - [ ] **Step 1: Write the failing CLI integration tests**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/CLITests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/CLITests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
-/// Integration tests that spawn the compiled `vibelight` binary.
+/// Integration tests that spawn the compiled `lightio` binary.
 /// They locate the binary via DerivedBuilds in `.build/`.
 final class CLITests: XCTestCase {
     var tempDir: URL!
 
     override func setUpWithError() throws {
         tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("vibelight-cli-tests-\(UUID().uuidString)")
+            .appendingPathComponent("lightio-cli-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
@@ -697,19 +697,19 @@ final class CLITests: XCTestCase {
     // MARK: - Helpers
 
     private func cliBinary() -> URL {
-        // SwiftPM puts the executable at .build/{arch}-apple-macosx/debug/vibelight.
+        // SwiftPM puts the executable at .build/{arch}-apple-macosx/debug/lightio.
         // Tests run from the package root, but we resolve relative to this file.
         let here = URL(fileURLWithPath: #filePath)
-        let pkgRoot = here.deletingLastPathComponent()  // VibelightCoreTests
+        let pkgRoot = here.deletingLastPathComponent()  // LightioCoreTests
             .deletingLastPathComponent()                 // Tests
-            .deletingLastPathComponent()                 // vibelight-cli
-        let debug = pkgRoot.appendingPathComponent(".build/debug/vibelight")
+            .deletingLastPathComponent()                 // lightio-cli
+        let debug = pkgRoot.appendingPathComponent(".build/debug/lightio")
         if FileManager.default.fileExists(atPath: debug.path) { return debug }
         // Fallback: search the arch-specific dir
         let arches = (try? FileManager.default.contentsOfDirectory(
             atPath: pkgRoot.appendingPathComponent(".build").path)) ?? []
         for arch in arches where arch.contains("apple-macosx") {
-            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/vibelight")
+            let candidate = pkgRoot.appendingPathComponent(".build/\(arch)/debug/lightio")
             if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
         }
         return debug
@@ -745,23 +745,23 @@ final class CLITests: XCTestCase {
 - [ ] **Step 2: Run tests to confirm they fail**
 
 ```bash
-cd /Users/jianshuo/code/vibelight/vibelight-cli
+cd /Users/jianshuo/code/lightio/lightio-cli
 swift build  # ensures the binary exists for the integration test
 swift test --filter CLITests
 ```
 
-Expected: all 4 tests fail — `vibelight set` prints "vibelight (stub)" and exits 0 without writing state.
+Expected: all 4 tests fail — `lightio set` prints "lightio (stub)" and exits 0 without writing state.
 
 - [ ] **Step 3: Implement CLI dispatch**
 
-Replace `vibelight-cli/Sources/vibelight/main.swift`:
+Replace `lightio-cli/Sources/lightio/main.swift`:
 
 ```swift
 import Foundation
-import VibelightCore
+import LightioCore
 
 @main
-struct VibelightCLI {
+struct LightioCLI {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
         let exitCode = run(args)
@@ -779,7 +779,7 @@ struct VibelightCLI {
                 guard args.count >= 2,
                       let state = SessionState(rawValue: args[1])
                 else {
-                    FileHandle.standardError.write(Data("Usage: vibelight set <working|waiting>\n".utf8))
+                    FileHandle.standardError.write(Data("Usage: lightio set <working|waiting>\n".utf8))
                     return 2
                 }
                 let input = try HookInputJSON.parse(readStdin())
@@ -809,11 +809,11 @@ struct VibelightCLI {
                 return 0
 
             default:
-                FileHandle.standardError.write(Data("Usage: vibelight <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
+                FileHandle.standardError.write(Data("Usage: lightio <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
                 return 2
             }
         } catch {
-            FileHandle.standardError.write(Data("vibelight: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("lightio: \(error)\n".utf8))
             return 1
         }
     }
@@ -833,12 +833,12 @@ struct VibelightCLI {
 
     static func printUsage() {
         let msg = """
-        Usage: vibelight <command>
+        Usage: lightio <command>
           set <working|waiting>    Update this session's state (reads hook JSON from stdin)
           clear                    Remove this session (reads hook JSON from stdin)
           status                   Print current state.json
-          install-hooks            Install vibelight hooks into ~/.claude/settings.json
-          uninstall-hooks          Remove vibelight hooks from ~/.claude/settings.json
+          install-hooks            Install lightio hooks into ~/.claude/settings.json
+          uninstall-hooks          Remove lightio hooks from ~/.claude/settings.json
         """
         FileHandle.standardError.write(Data((msg + "\n").utf8))
     }
@@ -857,9 +857,9 @@ Expected: all 4 CLITests pass. (`install-hooks` / `uninstall-hooks` will hit the
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/vibelight/main.swift \
-        vibelight-cli/Tests/VibelightCoreTests/CLITests.swift
-git commit -m "Implement vibelight set/clear/status commands"
+git add lightio-cli/Sources/lightio/main.swift \
+        lightio-cli/Tests/LightioCoreTests/CLITests.swift
+git commit -m "Implement lightio set/clear/status commands"
 ```
 
 ---
@@ -867,23 +867,23 @@ git commit -m "Implement vibelight set/clear/status commands"
 ## Task 6: HookInstaller — patch `~/.claude/settings.json`
 
 **Files:**
-- Create: `vibelight-cli/Sources/VibelightCore/HookInstaller.swift`
-- Create: `vibelight-cli/Tests/VibelightCoreTests/HookInstallerTests.swift`
+- Create: `lightio-cli/Sources/LightioCore/HookInstaller.swift`
+- Create: `lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/HookInstallerTests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 
 final class HookInstallerTests: XCTestCase {
     var tempHome: URL!
 
     override func setUpWithError() throws {
         tempHome = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("vibelight-hookinstaller-\(UUID().uuidString)")
+            .appendingPathComponent("lightio-hookinstaller-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
             at: tempHome.appendingPathComponent(".claude"),
             withIntermediateDirectories: true
@@ -897,7 +897,7 @@ final class HookInstallerTests: XCTestCase {
     private var settingsURL: URL { tempHome.appendingPathComponent(".claude/settings.json") }
 
     func testInstallIntoMissingSettingsCreatesFile() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -913,19 +913,19 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"otherKey": 42, "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         XCTAssertEqual(json["otherKey"] as? Int, 42)
         let hooks = json["hooks"] as! [String: Any]
         XCTAssertNotNil(hooks["PreToolUse"], "existing hook should be preserved")
-        XCTAssertNotNil(hooks["UserPromptSubmit"], "vibelight hook should be installed")
+        XCTAssertNotNil(hooks["UserPromptSubmit"], "lightio hook should be installed")
     }
 
     func testInstallIsIdempotent() throws {
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -938,19 +938,19 @@ final class HookInstallerTests: XCTestCase {
         let existing = #"{"hooks":{}}"#
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
-        let backupURL = settingsURL.appendingPathExtension("vibelight-backup")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        let backupURL = settingsURL.appendingPathExtension("lightio-backup")
         XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
         let backupData = try String(contentsOf: backupURL)
         XCTAssertEqual(backupData, existing)
 
         // Second install must NOT overwrite the backup (which would lose original)
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
         let backupDataAfter = try String(contentsOf: backupURL)
         XCTAssertEqual(backupDataAfter, existing, "backup must remain the original")
     }
 
-    func testUninstallRemovesVibelightHooksKeepsOthers() throws {
+    func testUninstallRemovesLightioHooksKeepsOthers() throws {
         let existing = """
         {
           "hooks": {
@@ -960,14 +960,14 @@ final class HookInstallerTests: XCTestCase {
         """
         try existing.data(using: .utf8)!.write(to: settingsURL)
 
-        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/vibelight")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
         try HookInstaller.uninstall(settingsURL: settingsURL)
 
         let data = try Data(contentsOf: settingsURL)
         let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
         let hooks = json["hooks"] as! [String: Any]
-        XCTAssertNotNil(hooks["PreToolUse"], "non-vibelight hook preserved")
-        XCTAssertNil(hooks["UserPromptSubmit"], "vibelight hook removed")
+        XCTAssertNotNil(hooks["PreToolUse"], "non-lightio hook preserved")
+        XCTAssertNil(hooks["UserPromptSubmit"], "lightio hook removed")
     }
 }
 ```
@@ -982,16 +982,16 @@ Expected: build error — `HookInstaller` not defined.
 
 - [ ] **Step 3: Implement HookInstaller**
 
-Create `vibelight-cli/Sources/VibelightCore/HookInstaller.swift`:
+Create `lightio-cli/Sources/LightioCore/HookInstaller.swift`:
 
 ```swift
 import Foundation
 
 public enum HookInstaller {
     /// Marker we embed in each command string so uninstall can find our hooks.
-    public static let marker = "vibelight"
+    public static let marker = "lightio"
 
-    /// Hook events vibelight installs.
+    /// Hook events lightio installs.
     static let hookEvents: [(event: String, args: String)] = [
         ("SessionStart",     "set waiting"),
         ("UserPromptSubmit", "set working"),
@@ -1000,9 +1000,9 @@ public enum HookInstaller {
         ("SessionEnd",       "clear"),
     ]
 
-    /// Install vibelight hooks into the given settings.json (creating the file
-    /// if missing). Existing non-vibelight hooks are preserved. A one-time
-    /// backup is written to `<file>.vibelight-backup`.
+    /// Install lightio hooks into the given settings.json (creating the file
+    /// if missing). Existing non-lightio hooks are preserved. A one-time
+    /// backup is written to `<file>.lightio-backup`.
     public static func install(settingsURL: URL, binaryPath: String) throws {
         try writeBackupIfNeeded(settingsURL: settingsURL)
 
@@ -1011,7 +1011,7 @@ public enum HookInstaller {
 
         for (event, args) in hookEvents {
             var entries = (hooks[event] as? [[String: Any]]) ?? []
-            entries.removeAll { isVibelightEntry($0) }
+            entries.removeAll { isLightioEntry($0) }
             entries.append([
                 "hooks": [[
                     "type": "command",
@@ -1025,7 +1025,7 @@ public enum HookInstaller {
         try writeSettings(json, to: settingsURL)
     }
 
-    /// Remove vibelight hooks. Non-vibelight hooks are preserved.
+    /// Remove lightio hooks. Non-lightio hooks are preserved.
     public static func uninstall(settingsURL: URL) throws {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return }
         var json = try readSettings(settingsURL)
@@ -1033,7 +1033,7 @@ public enum HookInstaller {
 
         for (event, _) in hookEvents {
             guard var entries = hooks[event] as? [[String: Any]] else { continue }
-            entries.removeAll { isVibelightEntry($0) }
+            entries.removeAll { isLightioEntry($0) }
             if entries.isEmpty {
                 hooks.removeValue(forKey: event)
             } else {
@@ -1046,7 +1046,7 @@ public enum HookInstaller {
 
     // MARK: - Helpers
 
-    private static func isVibelightEntry(_ entry: [String: Any]) -> Bool {
+    private static func isLightioEntry(_ entry: [String: Any]) -> Bool {
         guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
         return inner.contains { ($0["command"] as? String)?.contains(marker) == true }
     }
@@ -1073,7 +1073,7 @@ public enum HookInstaller {
     }
 
     private static func writeBackupIfNeeded(settingsURL: URL) throws {
-        let backup = settingsURL.appendingPathExtension("vibelight-backup")
+        let backup = settingsURL.appendingPathExtension("lightio-backup")
         guard FileManager.default.fileExists(atPath: settingsURL.path),
               !FileManager.default.fileExists(atPath: backup.path)
         else { return }
@@ -1093,9 +1093,9 @@ Expected: all 5 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/HookInstaller.swift \
-        vibelight-cli/Tests/VibelightCoreTests/HookInstallerTests.swift
-git commit -m "Add HookInstaller: install/uninstall vibelight hooks"
+git add lightio-cli/Sources/LightioCore/HookInstaller.swift \
+        lightio-cli/Tests/LightioCoreTests/HookInstallerTests.swift
+git commit -m "Add HookInstaller: install/uninstall lightio hooks"
 ```
 
 ---
@@ -1103,12 +1103,12 @@ git commit -m "Add HookInstaller: install/uninstall vibelight hooks"
 ## Task 7: CLI `install-hooks` / `uninstall-hooks` commands
 
 **Files:**
-- Modify: `vibelight-cli/Sources/vibelight/main.swift`
-- Modify: `vibelight-cli/Tests/VibelightCoreTests/CLITests.swift`
+- Modify: `lightio-cli/Sources/lightio/main.swift`
+- Modify: `lightio-cli/Tests/LightioCoreTests/CLITests.swift`
 
 - [ ] **Step 1: Add failing CLI tests for the new commands**
 
-Append to `vibelight-cli/Tests/VibelightCoreTests/CLITests.swift` inside the test class:
+Append to `lightio-cli/Tests/LightioCoreTests/CLITests.swift` inside the test class:
 
 ```swift
     func testInstallHooksPatchesSettingsFile() throws {
@@ -1132,7 +1132,7 @@ Append to `vibelight-cli/Tests/VibelightCoreTests/CLITests.swift` inside the tes
         XCTAssertNotNil(hooks["UserPromptSubmit"])
     }
 
-    func testUninstallHooksRemovesVibelightOnly() throws {
+    func testUninstallHooksRemovesLightioOnly() throws {
         let fakeHome = tempDir.appendingPathComponent("home")
         try FileManager.default.createDirectory(
             at: fakeHome.appendingPathComponent(".claude"),
@@ -1182,29 +1182,29 @@ Update the `runCLI` helper signature to accept extra env vars. Replace the exist
 
 ```bash
 swift test --filter CLITests/testInstallHooksPatchesSettingsFile
-swift test --filter CLITests/testUninstallHooksRemovesVibelightOnly
+swift test --filter CLITests/testUninstallHooksRemovesLightioOnly
 ```
 
 Expected: both fail because main.swift still hits the "Usage" branch.
 
 - [ ] **Step 3: Wire install-hooks / uninstall-hooks in main.swift**
 
-In `vibelight-cli/Sources/vibelight/main.swift`, replace the `default:` case in the switch statement with:
+In `lightio-cli/Sources/lightio/main.swift`, replace the `default:` case in the switch statement with:
 
 ```swift
             case "install-hooks":
-                let binaryPath = "/usr/local/bin/vibelight"
+                let binaryPath = "/usr/local/bin/lightio"
                 try HookInstaller.install(settingsURL: Paths.claudeSettingsFile, binaryPath: binaryPath)
-                FileHandle.standardOutput.write(Data("Installed vibelight hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
+                FileHandle.standardOutput.write(Data("Installed lightio hooks at \(Paths.claudeSettingsFile.path)\n".utf8))
                 return 0
 
             case "uninstall-hooks":
                 try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
-                FileHandle.standardOutput.write(Data("Removed vibelight hooks from \(Paths.claudeSettingsFile.path)\n".utf8))
+                FileHandle.standardOutput.write(Data("Removed lightio hooks from \(Paths.claudeSettingsFile.path)\n".utf8))
                 return 0
 
             default:
-                FileHandle.standardError.write(Data("Usage: vibelight <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
+                FileHandle.standardError.write(Data("Usage: lightio <set|clear|status|install-hooks|uninstall-hooks>\n".utf8))
                 return 2
 ```
 
@@ -1222,8 +1222,8 @@ Expected: all 6 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/vibelight/main.swift \
-        vibelight-cli/Tests/VibelightCoreTests/CLITests.swift
+git add lightio-cli/Sources/lightio/main.swift \
+        lightio-cli/Tests/LightioCoreTests/CLITests.swift
 git commit -m "Wire install-hooks/uninstall-hooks into CLI"
 ```
 
@@ -1232,14 +1232,14 @@ git commit -m "Wire install-hooks/uninstall-hooks into CLI"
 ## Task 8: StateStore — merge function (pure, in app target)
 
 **Files:**
-- Create: `vibelight/StateStore.swift`
-- Create: `vibelight/StateStoreMergeTests.swift` (will need a test target later — for now we test via the SwiftPM tests since the merge function will live in VibelightCore)
+- Create: `lightio/StateStore.swift`
+- Create: `lightio/StateStoreMergeTests.swift` (will need a test target later — for now we test via the SwiftPM tests since the merge function will live in LightioCore)
 
-**Note:** Since the app target doesn't have a test target yet, push the pure merge logic into `VibelightCore`. The `MergedState.merge(_:)` from Task 2 already accepts `[SessionState]`. We add a higher-level wrapper that takes the full `StateSnapshot`.
+**Note:** Since the app target doesn't have a test target yet, push the pure merge logic into `LightioCore`. The `MergedState.merge(_:)` from Task 2 already accepts `[SessionState]`. We add a higher-level wrapper that takes the full `StateSnapshot`.
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift` inside the class:
+Append to `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift` inside the class:
 
 ```swift
     func testMergeFromSnapshot() {
@@ -1269,7 +1269,7 @@ Expected: build error — no overload for `merge(snapshot:)`.
 
 - [ ] **Step 3: Add the snapshot overload**
 
-In `vibelight-cli/Sources/VibelightCore/SessionState.swift`, append inside the `MergedState` enum after the existing `merge(_:)` method:
+In `lightio-cli/Sources/LightioCore/SessionState.swift`, append inside the `MergedState` enum after the existing `merge(_:)` method:
 
 ```swift
     /// Convenience: derive the merged state directly from a state.json snapshot.
@@ -1289,8 +1289,8 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/SessionState.swift \
-        vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift
+git add lightio-cli/Sources/LightioCore/SessionState.swift \
+        lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift
 git commit -m "Add MergedState.merge(snapshot:) convenience"
 ```
 
@@ -1299,21 +1299,21 @@ git commit -m "Add MergedState.merge(snapshot:) convenience"
 ## Task 9: StateStore — FSEvents wiring + publisher in the app
 
 **Files:**
-- Create: `vibelight/StateStore.swift`
+- Create: `lightio/StateStore.swift`
 
 **Note:** This is in the Xcode app target. There's no app-target unit-test target in V1 (per spec's "minimal" stance), so we verify by manual smoke test in Task 16 plus the integration test added at the end of this task.
 
 - [ ] **Step 1: Implement StateStore**
 
-Create `vibelight/StateStore.swift`:
+Create `lightio/StateStore.swift`:
 
 ```swift
 import Foundation
 import Combine
 import CoreServices
-import VibelightCore
+import LightioCore
 
-/// Watches `~/.vibelight/state.json` and publishes the current merged state
+/// Watches `~/.lightio/state.json` and publishes the current merged state
 /// to subscribers. Owns the 5-minute idle timer.
 final class StateStore: ObservableObject {
     /// Currently-published state. NotchOverlay subscribes to this.
@@ -1422,7 +1422,7 @@ In Xcode, ⌘B. Expected: app target builds. We can't run it yet (no AppDelegate
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/StateStore.swift
+git add lightio/StateStore.swift
 git commit -m "Add StateStore: FSEvents watcher + idle timer"
 ```
 
@@ -1431,23 +1431,23 @@ git commit -m "Add StateStore: FSEvents watcher + idle timer"
 ## Task 10: NotchGeometry — pure rect computation
 
 **Files:**
-- Create: `vibelight/NotchGeometry.swift`
-- Append: `vibelight-cli/Tests/VibelightCoreTests/SessionStateTests.swift` (test goes in the SwiftPM package since the geometry math is pure and we want tests, but we keep the file in the app target for runtime access)
+- Create: `lightio/NotchGeometry.swift`
+- Append: `lightio-cli/Tests/LightioCoreTests/SessionStateTests.swift` (test goes in the SwiftPM package since the geometry math is pure and we want tests, but we keep the file in the app target for runtime access)
 
 **Note:** We duplicate the simple math logic in a way both contexts can use. The pure function takes screen size and notch dimensions as inputs, so it's easy to test with synthetic values.
 
-Actually — to keep DRY, we put the pure function in `VibelightCore` and the app calls it.
+Actually — to keep DRY, we put the pure function in `LightioCore` and the app calls it.
 
-- Create: `vibelight-cli/Sources/VibelightCore/NotchGeometry.swift`
-- Delete the plan to put it in the app target; replace the import with `import VibelightCore`.
+- Create: `lightio-cli/Sources/LightioCore/NotchGeometry.swift`
+- Delete the plan to put it in the app target; replace the import with `import LightioCore`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `vibelight-cli/Tests/VibelightCoreTests/NotchGeometryTests.swift`:
+Create `lightio-cli/Tests/LightioCoreTests/NotchGeometryTests.swift`:
 
 ```swift
 import XCTest
-@testable import VibelightCore
+@testable import LightioCore
 import CoreGraphics
 
 final class NotchGeometryTests: XCTestCase {
@@ -1491,7 +1491,7 @@ Expected: build error — `NotchGeometry` not defined.
 
 - [ ] **Step 3: Implement NotchGeometry**
 
-Create `vibelight-cli/Sources/VibelightCore/NotchGeometry.swift`:
+Create `lightio-cli/Sources/LightioCore/NotchGeometry.swift`:
 
 ```swift
 import CoreGraphics
@@ -1525,11 +1525,11 @@ Expected: both tests pass.
 
 - [ ] **Step 5: Add an app-side helper that pulls real values from NSScreen**
 
-Create `vibelight/NotchGeometry+NSScreen.swift`:
+Create `lightio/NotchGeometry+NSScreen.swift`:
 
 ```swift
 import AppKit
-import VibelightCore
+import LightioCore
 
 extension NotchGeometry {
     /// Best-effort: read the notch dimensions from `NSScreen.safeAreaInsets`
@@ -1567,9 +1567,9 @@ extension NotchGeometry {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add vibelight-cli/Sources/VibelightCore/NotchGeometry.swift \
-        vibelight-cli/Tests/VibelightCoreTests/NotchGeometryTests.swift \
-        vibelight/NotchGeometry+NSScreen.swift
+git add lightio-cli/Sources/LightioCore/NotchGeometry.swift \
+        lightio-cli/Tests/LightioCoreTests/NotchGeometryTests.swift \
+        lightio/NotchGeometry+NSScreen.swift
 git commit -m "Add NotchGeometry pure function + NSScreen helper"
 ```
 
@@ -1578,11 +1578,11 @@ git commit -m "Add NotchGeometry pure function + NSScreen helper"
 ## Task 11: NotchOverlayWindow — borderless transparent window
 
 **Files:**
-- Create: `vibelight/NotchOverlayWindow.swift`
+- Create: `lightio/NotchOverlayWindow.swift`
 
 - [ ] **Step 1: Implement the window**
 
-Create `vibelight/NotchOverlayWindow.swift`:
+Create `lightio/NotchOverlayWindow.swift`:
 
 ```swift
 import AppKit
@@ -1620,7 +1620,7 @@ final class NotchOverlayWindow: NSWindow {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight -destination 'platform=macOS' build 2>&1 | tail -20
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio -destination 'platform=macOS' build 2>&1 | tail -20
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1628,7 +1628,7 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/NotchOverlayWindow.swift
+git add lightio/NotchOverlayWindow.swift
 git commit -m "Add NotchOverlayWindow: borderless transparent click-through"
 ```
 
@@ -1637,17 +1637,17 @@ git commit -m "Add NotchOverlayWindow: borderless transparent click-through"
 ## Task 12: NotchOverlayView — CALayer glow rendering
 
 **Files:**
-- Create: `vibelight/NotchOverlayView.swift`
+- Create: `lightio/NotchOverlayView.swift`
 
 - [ ] **Step 1: Implement the view**
 
-Create `vibelight/NotchOverlayView.swift`:
+Create `lightio/NotchOverlayView.swift`:
 
 ```swift
 import AppKit
 import Combine
 import QuartzCore
-import VibelightCore
+import LightioCore
 
 /// Renders the glow underneath the notch. Driven by a published `MergedState`.
 final class NotchOverlayView: NSView {
@@ -1768,7 +1768,7 @@ final class NotchOverlayView: NSView {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight -destination 'platform=macOS' build 2>&1 | tail -10
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio -destination 'platform=macOS' build 2>&1 | tail -10
 ```
 
 Expected: `** BUILD SUCCEEDED **`.
@@ -1776,7 +1776,7 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/NotchOverlayView.swift
+git add lightio/NotchOverlayView.swift
 git commit -m "Add NotchOverlayView: CALayer glow rendering"
 ```
 
@@ -1785,11 +1785,11 @@ git commit -m "Add NotchOverlayView: CALayer glow rendering"
 ## Task 13: Ding pulse animation on state change
 
 **Files:**
-- Modify: `vibelight/NotchOverlayView.swift`
+- Modify: `lightio/NotchOverlayView.swift`
 
 - [ ] **Step 1: Add the pulse animation**
 
-Replace the `applyState(_:animated:)` method in `vibelight/NotchOverlayView.swift` with:
+Replace the `applyState(_:animated:)` method in `lightio/NotchOverlayView.swift` with:
 
 ```swift
     private func applyState(_ state: MergedState, animated: Bool) {
@@ -1854,7 +1854,7 @@ Replace the `applyState(_:animated:)` method in `vibelight/NotchOverlayView.swif
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -1862,7 +1862,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/NotchOverlayView.swift
+git add lightio/NotchOverlayView.swift
 git commit -m "Add ding-pulse animation on state change"
 ```
 
@@ -1871,16 +1871,16 @@ git commit -m "Add ding-pulse animation on state change"
 ## Task 14: MenuBarController — NSStatusItem + menu
 
 **Files:**
-- Create: `vibelight/MenuBarController.swift`
+- Create: `lightio/MenuBarController.swift`
 
 - [ ] **Step 1: Implement the controller**
 
-Create `vibelight/MenuBarController.swift`:
+Create `lightio/MenuBarController.swift`:
 
 ```swift
 import AppKit
 import Combine
-import VibelightCore
+import LightioCore
 
 /// Owns the menu-bar status item: a tinted dot whose color tracks the merged
 /// state, and a menu with the install/uninstall hooks actions.
@@ -1979,7 +1979,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let about = NSMenuItem(title: "About vibelight", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: "About lightio", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
@@ -1987,7 +1987,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func stateMenuTitle() -> String {
-        guard let store = store else { return "vibelight" }
+        guard let store = store else { return "lightio" }
         let stateLabel: String
         switch store.currentState {
         case .working: stateLabel = "WORKING"
@@ -2017,7 +2017,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -2025,7 +2025,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/MenuBarController.swift
+git add lightio/MenuBarController.swift
 git commit -m "Add MenuBarController: status item dot + menu"
 ```
 
@@ -2034,26 +2034,26 @@ git commit -m "Add MenuBarController: status item dot + menu"
 ## Task 15: FirstRun — symlink install, hook install dialog, launch-at-login
 
 **Files:**
-- Create: `vibelight/FirstRun.swift`
+- Create: `lightio/FirstRun.swift`
 
 - [ ] **Step 1: Implement FirstRun**
 
-Create `vibelight/FirstRun.swift`:
+Create `lightio/FirstRun.swift`:
 
 ```swift
 import AppKit
 import ServiceManagement
-import VibelightCore
+import LightioCore
 
 /// Handles one-time install steps on first launch and exposes "Install Hooks"
 /// as a re-runnable action.
 enum FirstRun {
-    static let symlinkPath = "/usr/local/bin/vibelight"
+    static let symlinkPath = "/usr/local/bin/lightio"
 
     /// Path to the CLI bundled inside this .app.
     static var bundledCLIPath: String {
-        Bundle.main.resourcePath.map { "\($0)/vibelight" }
-            ?? "/Applications/vibelight.app/Contents/Resources/vibelight"
+        Bundle.main.resourcePath.map { "\($0)/lightio" }
+            ?? "/Applications/lightio.app/Contents/Resources/lightio"
     }
 
     // MARK: - Symlink
@@ -2075,13 +2075,13 @@ enum FirstRun {
     static func installSymlinkInteractively() -> Bool {
         let escaped = bundledCLIPath.replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
-        do shell script "mkdir -p /usr/local/bin && ln -sf \\"\(escaped)\\" /usr/local/bin/vibelight" with administrator privileges
+        do shell script "mkdir -p /usr/local/bin && ln -sf \\"\(escaped)\\" /usr/local/bin/lightio" with administrator privileges
         """
         var errorInfo: NSDictionary?
         let runner = NSAppleScript(source: script)
         _ = runner?.executeAndReturnError(&errorInfo)
         if let error = errorInfo {
-            NSLog("vibelight symlink install failed: \(error)")
+            NSLog("lightio symlink install failed: \(error)")
             return false
         }
         return isSymlinkInstalled()
@@ -2101,8 +2101,8 @@ enum FirstRun {
         alert.messageText = "Install Claude Code Hooks?"
         alert.informativeText = """
         检测到 Claude Code (~/.claude/settings.json)。
-        是否将 vibelight 的 hooks 加入其中？
-        原文件会备份到 settings.json.vibelight-backup。
+        是否将 lightio 的 hooks 加入其中？
+        原文件会备份到 settings.json.lightio-backup。
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Install")
@@ -2122,7 +2122,7 @@ enum FirstRun {
             )
             return true
         } catch {
-            NSLog("vibelight installHooks failed: \(error)")
+            NSLog("lightio installHooks failed: \(error)")
             return false
         }
     }
@@ -2133,7 +2133,7 @@ enum FirstRun {
             try HookInstaller.uninstall(settingsURL: Paths.claudeSettingsFile)
             return true
         } catch {
-            NSLog("vibelight uninstallHooks failed: \(error)")
+            NSLog("lightio uninstallHooks failed: \(error)")
             return false
         }
     }
@@ -2158,7 +2158,7 @@ enum FirstRun {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                NSLog("vibelight setLaunchAtLogin failed: \(error)")
+                NSLog("lightio setLaunchAtLogin failed: \(error)")
             }
         }
     }
@@ -2168,7 +2168,7 @@ enum FirstRun {
 - [ ] **Step 2: Build to verify no compile errors**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build 2>&1 | tail -5
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -5
 ```
 
 Expected: build succeeds.
@@ -2176,7 +2176,7 @@ Expected: build succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add vibelight/FirstRun.swift
+git add lightio/FirstRun.swift
 git commit -m "Add FirstRun: symlink, hooks dialog, launch-at-login"
 ```
 
@@ -2185,19 +2185,19 @@ git commit -m "Add FirstRun: symlink, hooks dialog, launch-at-login"
 ## Task 16: AppDelegate — wire everything together
 
 **Files:**
-- Create: `vibelight/AppDelegate.swift`
-- Modify: `vibelight/vibelightApp.swift`
-- Delete: `vibelight/ContentView.swift`
+- Create: `lightio/AppDelegate.swift`
+- Modify: `lightio/lightioApp.swift`
+- Delete: `lightio/ContentView.swift`
 - Configure: Info.plist (via Xcode UI, `LSUIElement = YES`)
 
 - [ ] **Step 1: Write the AppDelegate**
 
-Create `vibelight/AppDelegate.swift`:
+Create `lightio/AppDelegate.swift`:
 
 ```swift
 import AppKit
 import SwiftUI
-import VibelightCore
+import LightioCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: StateStore!
@@ -2220,7 +2220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             overlayWindow.orderFrontRegardless()
             overlayView.bind(store.$currentState)
         } else {
-            NSLog("vibelight: no notch detected; overlay disabled")
+            NSLog("lightio: no notch detected; overlay disabled")
         }
 
         // 3. Build menu bar
@@ -2249,9 +2249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Symlink
         if !FirstRun.isSymlinkInstalled() {
             let alert = NSAlert()
-            alert.messageText = "Install vibelight CLI?"
+            alert.messageText = "Install lightio CLI?"
             alert.informativeText = """
-            需要把 CLI 安装到 /usr/local/bin/vibelight，
+            需要把 CLI 安装到 /usr/local/bin/lightio，
             这一步需要管理员密码（一次性）。
             """
             alert.addButton(withTitle: "Install")
@@ -2262,7 +2262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Hooks
         if FirstRun.claudeSettingsExists() {
-            // Only offer if vibelight hooks aren't already there.
+            // Only offer if lightio hooks aren't already there.
             if (try? Data(contentsOf: Paths.claudeSettingsFile))
                 .flatMap({ String(data: $0, encoding: .utf8) })?
                 .contains(HookInstaller.marker) != true {
@@ -2279,7 +2279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if FirstRun.installHooks() {
             let alert = NSAlert()
             alert.messageText = "Hooks installed"
-            alert.informativeText = "vibelight hooks added to ~/.claude/settings.json"
+            alert.informativeText = "lightio hooks added to ~/.claude/settings.json"
             alert.runModal()
         } else {
             let alert = NSAlert()
@@ -2311,7 +2311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 - [ ] **Step 2: Expose `previewState` on NotchOverlayView**
 
-Append to `vibelight/NotchOverlayView.swift` inside the class:
+Append to `lightio/NotchOverlayView.swift` inside the class:
 
 ```swift
     /// Force the view to a specific state without going through the publisher.
@@ -2323,13 +2323,13 @@ Append to `vibelight/NotchOverlayView.swift` inside the class:
 
 - [ ] **Step 3: Replace the SwiftUI App entry to use AppDelegate**
 
-Edit `vibelight/vibelightApp.swift` to be:
+Edit `lightio/lightioApp.swift` to be:
 
 ```swift
 import SwiftUI
 
 @main
-struct vibelightApp: App {
+struct lightioApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -2343,13 +2343,13 @@ struct vibelightApp: App {
 - [ ] **Step 4: Delete the obsolete ContentView**
 
 ```bash
-rm /Users/jianshuo/code/vibelight/vibelight/ContentView.swift
+rm /Users/jianshuo/code/lightio/lightio/ContentView.swift
 ```
 
 - [ ] **Step 5: Set LSUIElement in Info.plist (via Xcode UI)**
 
 In Xcode:
-1. Select the `vibelight` target → "Info" tab (or open the Info.plist editor in the project navigator).
+1. Select the `lightio` target → "Info" tab (or open the Info.plist editor in the project navigator).
 2. Add a new key: `Application is agent (UIElement)` (raw key: `LSUIElement`), type Boolean, value `YES`.
 3. Save.
 
@@ -2358,7 +2358,7 @@ This hides the Dock icon and turns the app into a menu-bar-only agent.
 - [ ] **Step 6: Build the app**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build 2>&1 | tail -10
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build 2>&1 | tail -10
 ```
 
 Expected: build succeeds.
@@ -2366,14 +2366,14 @@ Expected: build succeeds.
 - [ ] **Step 7: Manual smoke test — launch and observe**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build
-APP=$(find ~/Library/Developer/Xcode/DerivedData/vibelight-*/Build/Products/Debug/vibelight.app -maxdepth 0 -type d | head -1)
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build
+APP=$(find ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app -maxdepth 0 -type d | head -1)
 open "$APP"
 ```
 
 Manually verify:
-- Dock has NO vibelight icon
-- Menu bar shows a small dim circle (vibelight)
+- Dock has NO lightio icon
+- Menu bar shows a small dim circle (lightio)
 - The notch glows green for ~1s then dims
 - Clicking the menu bar item shows the menu with "Install Claude Code Hooks" etc.
 - "Quit" exits the app cleanly
@@ -2383,11 +2383,11 @@ Document any issues in a scratch note for later. If a critical failure (no notch
 - [ ] **Step 8: Commit**
 
 ```bash
-git add vibelight/AppDelegate.swift \
-        vibelight/vibelightApp.swift \
-        vibelight/NotchOverlayView.swift \
-        vibelight.xcodeproj
-git rm vibelight/ContentView.swift
+git add lightio/AppDelegate.swift \
+        lightio/lightioApp.swift \
+        lightio/NotchOverlayView.swift \
+        lightio.xcodeproj
+git rm lightio/ContentView.swift
 git commit -m "Wire AppDelegate: overlay + menu bar + first-run + LSUIElement"
 ```
 
@@ -2400,15 +2400,15 @@ git commit -m "Wire AppDelegate: overlay + menu bar + first-run + LSUIElement"
 - [ ] **Step 1: Build a fresh debug build**
 
 ```bash
-xcodebuild -project /Users/jianshuo/code/vibelight/vibelight.xcodeproj -scheme vibelight build
+xcodebuild -project /Users/jianshuo/code/lightio/lightio.xcodeproj -scheme lightio build
 ```
 
 - [ ] **Step 2: Locate, copy and launch the .app**
 
 ```bash
-APP=$(find ~/Library/Developer/Xcode/DerivedData/vibelight-*/Build/Products/Debug/vibelight.app -maxdepth 0 -type d | head -1)
+APP=$(find ~/Library/Developer/Xcode/DerivedData/lightio-*/Build/Products/Debug/lightio.app -maxdepth 0 -type d | head -1)
 cp -R "$APP" /Applications/
-open /Applications/vibelight.app
+open /Applications/lightio.app
 ```
 
 - [ ] **Step 3: Walk through first-run flow**
@@ -2418,13 +2418,13 @@ When the hooks dialog appears → "Install".
 
 Verify:
 ```bash
-ls -l /usr/local/bin/vibelight
+ls -l /usr/local/bin/lightio
 cat ~/.claude/settings.json | python3 -m json.tool | head -40
 ```
 
 Expected:
-- `/usr/local/bin/vibelight` is a symlink to the bundled binary
-- `~/.claude/settings.json` has 5 hook events with commands containing `vibelight`
+- `/usr/local/bin/lightio` is a symlink to the bundled binary
+- `~/.claude/settings.json` has 5 hook events with commands containing `lightio`
 
 - [ ] **Step 4: Run a real Claude Code session and observe**
 
@@ -2444,25 +2444,25 @@ Then in Claude Code, type a prompt (e.g., "list files") and watch the notch:
 
 If any state doesn't show: check
 ```bash
-cat ~/.vibelight/state.json
-vibelight status
+cat ~/.lightio/state.json
+lightio status
 ```
 
 - [ ] **Step 5: Test uninstall flow**
 
 ```bash
-vibelight uninstall-hooks
-cat ~/.claude/settings.json | python3 -m json.tool | grep -i vibelight
+lightio uninstall-hooks
+cat ~/.claude/settings.json | python3 -m json.tool | grep -i lightio
 ```
 
-Expected: no vibelight commands in settings.json.
+Expected: no lightio commands in settings.json.
 
 Reinstall via menu bar → "Install Claude Code Hooks". Verify it comes back.
 
 - [ ] **Step 6: Verify state.json schema**
 
 ```bash
-cat ~/.vibelight/state.json | python3 -m json.tool
+cat ~/.lightio/state.json | python3 -m json.tool
 ```
 
 Expected: matches the schema in the spec — `version: 1`, `sessions` map with `state`, `ts`, optional `cwd` per entry.
@@ -2471,7 +2471,7 @@ Expected: matches the schema in the spec — `version: 1`, `sessions` map with `
 
 Open a temporary note (NOT committed) summarizing what worked, what didn't. For each issue:
 - If small (typo, label, color tweak) — fix in code, commit a follow-up.
-- If structural — capture as a known-issue line in `docs/superpowers/specs/2026-05-28-vibelight-design.md` under "Section 10. Risks & open questions".
+- If structural — capture as a known-issue line in `docs/superpowers/specs/2026-05-28-lightio-design.md` under "Section 10. Risks & open questions".
 
 - [ ] **Step 8: Final commit (if any fixups)**
 
@@ -2483,7 +2483,7 @@ git commit -m "Post-E2E verification fixups"
 - [ ] **Step 9: Tag V1**
 
 ```bash
-git tag v0.1.0 -m "vibelight V1 — local install"
+git tag v0.1.0 -m "lightio V1 — local install"
 ```
 
 V1 ship complete.
@@ -2515,7 +2515,7 @@ One follow-up I'll handle as a minor edit-in-task rather than a new task: Task 9
 
 ## Execution Handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-05-28-vibelight-v1.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-05-28-lightio-v1.md`.
 
 Two execution options:
 

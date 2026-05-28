@@ -1,0 +1,121 @@
+import XCTest
+@testable import LightioCore
+
+final class HookInstallerTests: XCTestCase {
+    var tempHome: URL!
+
+    override func setUpWithError() throws {
+        tempHome = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("lightio-hookinstaller-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: tempHome.appendingPathComponent(".claude"),
+            withIntermediateDirectories: true
+        )
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: tempHome)
+    }
+
+    private var settingsURL: URL { tempHome.appendingPathComponent(".claude/settings.json") }
+
+    func testInstallIntoMissingSettingsCreatesFile() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        XCTAssertNotNil(hooks["SessionStart"])
+        XCTAssertNotNil(hooks["UserPromptSubmit"])
+        XCTAssertNotNil(hooks["Stop"])
+        XCTAssertNotNil(hooks["Notification"])
+        XCTAssertNotNil(hooks["SessionEnd"])
+    }
+
+    func testInstallIntoExistingSettingsPreservesOtherKeys() throws {
+        let existing = #"{"otherKey": 42, "hooks": {"PreToolUse": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}"#
+        try existing.data(using: .utf8)!.write(to: settingsURL)
+
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        XCTAssertEqual(json["otherKey"] as? Int, 42)
+        let hooks = json["hooks"] as! [String: Any]
+        XCTAssertNotNil(hooks["PreToolUse"], "existing hook should be preserved")
+        XCTAssertNotNil(hooks["UserPromptSubmit"], "lightio hook should be installed")
+    }
+
+    func testInstallIsIdempotent() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        let userPrompt = hooks["UserPromptSubmit"] as! [[String: Any]]
+        XCTAssertEqual(userPrompt.count, 1, "should not duplicate on repeat install")
+    }
+
+    func testInstallCreatesBackupOnce() throws {
+        let existing = #"{"hooks":{}}"#
+        try existing.data(using: .utf8)!.write(to: settingsURL)
+
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        let backupURL = settingsURL.appendingPathExtension("lightio-backup")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupURL.path))
+        let backupData = try String(contentsOf: backupURL)
+        XCTAssertEqual(backupData, existing)
+
+        // Second install must NOT overwrite the backup
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        let backupDataAfter = try String(contentsOf: backupURL)
+        XCTAssertEqual(backupDataAfter, existing, "backup must remain the original")
+    }
+
+    func testInstalledCommandIsWrappedForMissingBinary() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/nonexistent/lightio")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        let sessionEnd = hooks["SessionEnd"] as! [[String: Any]]
+        let inner = sessionEnd[0]["hooks"] as! [[String: Any]]
+        let command = inner[0]["command"] as! String
+
+        XCTAssertTrue(command.hasPrefix("/bin/sh -c "), "command must be wrapped: \(command)")
+        XCTAssertTrue(command.contains("[ -x "), "command must guard with -x test: \(command)")
+        XCTAssertTrue(command.contains("exit 0"), "command must end with exit 0: \(command)")
+
+        // The real proof: actually run it. With a missing binary the hook
+        // must exit 0 so Claude Code never surfaces a SessionEnd error.
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+        proc.arguments = ["-c", command]
+        proc.standardOutput = Pipe()
+        proc.standardError = Pipe()
+        try proc.run()
+        proc.waitUntilExit()
+        XCTAssertEqual(proc.terminationStatus, 0, "missing-binary hook must no-op cleanly")
+    }
+
+    func testUninstallRemovesLightioHooksKeepsOthers() throws {
+        let existing = """
+        {
+          "hooks": {
+            "PreToolUse": [{"hooks": [{"type":"command","command":"echo hi"}]}]
+          }
+        }
+        """
+        try existing.data(using: .utf8)!.write(to: settingsURL)
+
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/usr/local/bin/lightio")
+        try HookInstaller.uninstall(settingsURL: settingsURL)
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        XCTAssertNotNil(hooks["PreToolUse"], "non-lightio hook preserved")
+        XCTAssertNil(hooks["UserPromptSubmit"], "lightio hook removed")
+    }
+}

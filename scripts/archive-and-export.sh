@@ -1,6 +1,6 @@
 #!/bin/bash
-# Archive Vibe Light for App Store distribution.
-# Prereq: an app record for bundle id com.wangjianshuo.vibelight must exist
+# Archive Lightio for App Store distribution.
+# Prereq: an app record for bundle id com.wangjianshuo.lightio must exist
 # in App Store Connect (https://appstoreconnect.apple.com/apps) and the team's
 # Apple Distribution cert + provisioning profile must be available.
 #
@@ -12,7 +12,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-ARCHIVE="$ROOT/build/VibeLight.xcarchive"
+ARCHIVE="$ROOT/build/Lightio.xcarchive"
 EXPORT_DIR="$ROOT/build/export"
 EXPORT_OPTS="$ROOT/scripts/ExportOptions.plist"
 
@@ -21,8 +21,8 @@ rm -rf "$ARCHIVE" "$EXPORT_DIR"
 
 echo "==> Archive"
 xcodebuild \
-  -project vibelight.xcodeproj \
-  -scheme vibelight \
+  -project lightio.xcodeproj \
+  -scheme lightio \
   -configuration Release \
   -destination 'platform=macOS' \
   archive \

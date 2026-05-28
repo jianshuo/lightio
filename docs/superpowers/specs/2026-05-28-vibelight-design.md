@@ -1,4 +1,4 @@
-# Vibelight — Design Spec
+# Lightio — Design Spec
 
 Date: 2026-05-28
 Author: Jianshuo Wang (brainstormed with Claude)
@@ -112,17 +112,17 @@ Four components, all in one `.app` bundle:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ vibelight.app  (LSUIElement = true, no Dock icon)           │
+│ lightio.app  (LSUIElement = true, no Dock icon)           │
 │                                                             │
 │  ┌──────────────┐    FSEvents    ┌────────────────────┐    │
-│  │  StateStore  │ ◄────────────  │ ~/.vibelight/      │    │
+│  │  StateStore  │ ◄────────────  │ ~/.lightio/      │    │
 │  │              │                │   state.json       │    │
 │  │ - debounce   │                └────────────────────┘    │
 │  │ - merge      │                          ▲                │
 │  │   sessions   │                          │ atomic write   │
 │  │ - 5min timer │                          │                │
 │  └──────┬───────┘                ┌─────────┴────────┐       │
-│         │ publishes              │  vibelight CLI    │       │
+│         │ publishes              │  lightio CLI    │       │
 │         │ CurrentState           │  (bundled binary, │       │
 │         ▼                        │   symlinked to    │       │
 │  ┌──────────────┐                │   /usr/local/bin) │       │
@@ -142,28 +142,28 @@ Four components, all in one `.app` bundle:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Component: CLI (`vibelight`)
+### Component: CLI (`lightio`)
 
-Swift binary, ~50KB. Bundled inside `vibelight.app/Contents/Resources/vibelight`.
-On first launch the app installs a symlink to `/usr/local/bin/vibelight`
+Swift binary, ~50KB. Bundled inside `lightio.app/Contents/Resources/lightio`.
+On first launch the app installs a symlink to `/usr/local/bin/lightio`
 (requires admin password once, via `STPrivilegedTask` or `osascript`).
 
 Commands:
 
 | Command                          | Effect                                                                       |
 |----------------------------------|------------------------------------------------------------------------------|
-| `vibelight set <working|waiting>`| Reads Claude Code's hook-input JSON on stdin, extracts `session_id` + `cwd`, atomic-writes that session's entry into state.json. Falls back to session id `"default"` if stdin is empty (for dev testing). |
-| `vibelight clear`                | Same input handling; removes the session entry                               |
-| `vibelight status`               | Print current state.json (debug, ignores stdin)                              |
-| `vibelight install-hooks`        | Patch `~/.claude/settings.json` to add hooks                                 |
-| `vibelight uninstall-hooks`      | Remove vibelight hooks from settings.json                                    |
+| `lightio set <working|waiting>`| Reads Claude Code's hook-input JSON on stdin, extracts `session_id` + `cwd`, atomic-writes that session's entry into state.json. Falls back to session id `"default"` if stdin is empty (for dev testing). |
+| `lightio clear`                | Same input handling; removes the session entry                               |
+| `lightio status`               | Print current state.json (debug, ignores stdin)                              |
+| `lightio install-hooks`        | Patch `~/.claude/settings.json` to add hooks                                 |
+| `lightio uninstall-hooks`      | Remove lightio hooks from settings.json                                    |
 
 Atomic write: write to `state.json.tmp.<pid>` then `rename(2)` over `state.json`.
 This guarantees the FSEventStream consumer never sees a half-written file.
 
 ### Component: StateStore
 
-Singleton inside the app. Watches `~/.vibelight/state.json` via
+Singleton inside the app. Watches `~/.lightio/state.json` via
 `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents`. On every
 change:
 
@@ -196,7 +196,7 @@ filled circle matching the current state color.
 Menu:
 
 ```
-● vibelight                                  ← colored dot matching state
+● lightio                                  ← colored dot matching state
 ─────────────────
 当前状态: WORKING (1 个 session)
 ─────────────────
@@ -205,13 +205,13 @@ Uninstall Claude Code Hooks
 ─────────────────
 Launch at Login                            ✓
 ─────────────────
-About vibelight
+About lightio
 Quit
 ```
 
 ## 5. Data formats
 
-### `~/.vibelight/state.json`
+### `~/.lightio/state.json`
 
 ```json
 {
@@ -220,7 +220,7 @@ Quit
     "abc123-session-uuid": {
       "state": "working",
       "ts": 1779944100,
-      "cwd": "/Users/jianshuo/code/vibelight"
+      "cwd": "/Users/jianshuo/code/lightio"
     },
     "def456-session-uuid": {
       "state": "waiting",
@@ -243,40 +243,40 @@ Quit
 {
   "hooks": {
     "SessionStart": [
-      {"hooks": [{"type": "command", "command": "vibelight set waiting"}]}
+      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
     ],
     "UserPromptSubmit": [
-      {"hooks": [{"type": "command", "command": "vibelight set working"}]}
+      {"hooks": [{"type": "command", "command": "lightio set working"}]}
     ],
     "Stop": [
-      {"hooks": [{"type": "command", "command": "vibelight set waiting"}]}
+      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
     ],
     "Notification": [
-      {"hooks": [{"type": "command", "command": "vibelight set waiting"}]}
+      {"hooks": [{"type": "command", "command": "lightio set waiting"}]}
     ],
     "SessionEnd": [
-      {"hooks": [{"type": "command", "command": "vibelight clear"}]}
+      {"hooks": [{"type": "command", "command": "lightio clear"}]}
     ]
   }
 }
 ```
 
 Claude Code pipes a JSON payload to each hook's stdin containing
-`session_id`, `cwd`, `hook_event_name` etc. The `vibelight` CLI reads that
+`session_id`, `cwd`, `hook_event_name` etc. The `lightio` CLI reads that
 JSON to identify the session.
 
 The installer merges with existing hooks (does not clobber). Original
-settings.json is backed up to `settings.json.vibelight-backup` once.
+settings.json is backed up to `settings.json.lightio-backup` once.
 
 ## 6. First-run UX
 
-1. User drags `vibelight.app` from `.dmg` into `/Applications`, double-clicks.
-2. App checks `/usr/local/bin/vibelight`:
-   - Missing → dialog: "需要把 CLI 安装到 `/usr/local/bin/vibelight`，
+1. User drags `lightio.app` from `.dmg` into `/Applications`, double-clicks.
+2. App checks `/usr/local/bin/lightio`:
+   - Missing → dialog: "需要把 CLI 安装到 `/usr/local/bin/lightio`，
      这一步需要管理员密码。" → user approves → admin-elevated `ln -s`.
 3. App checks `~/.claude/settings.json`:
-   - Exists → dialog: "检测到 Claude Code，是否自动加入 vibelight 的 hooks？
-     原文件会备份到 `settings.json.vibelight-backup`。" → user approves →
+   - Exists → dialog: "检测到 Claude Code，是否自动加入 lightio 的 hooks？
+     原文件会备份到 `settings.json.lightio-backup`。" → user approves →
      CLI's `install-hooks` runs.
    - Missing → dialog skipped; "Install Hooks" menu item remains for later.
 4. `SMAppService.mainApp.register()` to enable Launch at Login.
@@ -285,11 +285,11 @@ settings.json is backed up to `settings.json.vibelight-backup` once.
 ## 7. Build & ship (V1)
 
 - **Target**: macOS 14+ (Sonoma) — needed for safe-area APIs.
-- **Project**: existing `vibelight.xcodeproj` (SwiftUI scaffold — to be
+- **Project**: existing `lightio.xcodeproj` (SwiftUI scaffold — to be
   largely replaced; only `App` entry point is reused).
 - **Distribution**: signed `.dmg` from local Developer ID (not App Store).
 - **No sandbox** in V1 (needed for the `/usr/local/bin` symlink).
-- **Min build**: `xcodebuild -scheme vibelight build`. Manual smoke test on
+- **Min build**: `xcodebuild -scheme lightio build`. Manual smoke test on
   the dev machine.
 
 ## 8. Out of scope for V1
@@ -322,7 +322,7 @@ settings.json is backed up to `settings.json.vibelight-backup` once.
    `auxiliaryTopRightArea`.
 2. **Symlink + sudo**: requesting admin password on first launch is a UX
    hit. Alternative: drop the symlink and have the hook config use the
-   full path `/Applications/vibelight.app/Contents/Resources/vibelight`.
+   full path `/Applications/lightio.app/Contents/Resources/lightio`.
    Cleaner but more brittle if user renames the app. Default to symlink,
    but expose this in install-hooks via a `--no-symlink` flag.
 3. **FSEvents latency**: typically <100ms but can spike. Acceptable for

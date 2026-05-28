@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		D4D3F8612FC7FF63005965CA /* lightio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = lightio.app; path = Lightio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4D3F8612FC7FF63005965CA /* lightio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = lightio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -92,7 +92,7 @@
 					};
 				};
 			};
-			buildConfigurationList = D4D3F85C2FC7FF63005965CA /* Build configuration list for PBXProject "vibelight" */;
+			buildConfigurationList = D4D3F85C2FC7FF63005965CA /* Build configuration list for PBXProject "lightio" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -113,16 +113,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		D4D3F85F2FC7FF63005965CA /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		A0000000000000000001B0F3 /* Embed lightio CLI */ = {
@@ -145,6 +135,16 @@
 			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/lightio-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/lightiocli\" \"$DEST/lightio\"\nchmod +x \"$DEST/lightio\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$DEST/lightio\"\nfi\necho \"Embedded lightio CLI → $DEST/lightio\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D4D3F85F2FC7FF63005965CA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D4D3F85D2FC7FF63005965CA /* Sources */ = {
@@ -292,7 +292,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Lightio;
+				INFOPLIST_KEY_CFBundleDisplayName = "Lightio";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -327,7 +327,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Lightio;
+				INFOPLIST_KEY_CFBundleDisplayName = "Lightio";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -350,7 +350,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D4D3F85C2FC7FF63005965CA /* Build configuration list for PBXProject "vibelight" */ = {
+		D4D3F85C2FC7FF63005965CA /* Build configuration list for PBXProject "lightio" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D4D3F86A2FC7FF65005965CA /* Debug */,
