@@ -73,6 +73,32 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertEqual(backupDataAfter, existing, "backup must remain the original")
     }
 
+    func testInstalledCommandIsWrappedForMissingBinary() throws {
+        try HookInstaller.install(settingsURL: settingsURL, binaryPath: "/nonexistent/vibelight")
+
+        let data = try Data(contentsOf: settingsURL)
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let hooks = json["hooks"] as! [String: Any]
+        let sessionEnd = hooks["SessionEnd"] as! [[String: Any]]
+        let inner = sessionEnd[0]["hooks"] as! [[String: Any]]
+        let command = inner[0]["command"] as! String
+
+        XCTAssertTrue(command.hasPrefix("/bin/sh -c "), "command must be wrapped: \(command)")
+        XCTAssertTrue(command.contains("[ -x "), "command must guard with -x test: \(command)")
+        XCTAssertTrue(command.contains("exit 0"), "command must end with exit 0: \(command)")
+
+        // The real proof: actually run it. With a missing binary the hook
+        // must exit 0 so Claude Code never surfaces a SessionEnd error.
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+        proc.arguments = ["-c", command]
+        proc.standardOutput = Pipe()
+        proc.standardError = Pipe()
+        try proc.run()
+        proc.waitUntilExit()
+        XCTAssertEqual(proc.terminationStatus, 0, "missing-binary hook must no-op cleanly")
+    }
+
     func testUninstallRemovesVibelightHooksKeepsOthers() throws {
         let existing = """
         {

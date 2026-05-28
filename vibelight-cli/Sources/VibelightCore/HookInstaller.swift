@@ -28,7 +28,7 @@ public enum HookInstaller {
             entries.append([
                 "hooks": [[
                     "type": "command",
-                    "command": "\(binaryPath) \(args)",
+                    "command": wrappedCommand(binaryPath: binaryPath, args: args),
                 ]]
             ])
             hooks[event] = entries
@@ -58,6 +58,14 @@ public enum HookInstaller {
     }
 
     // MARK: - Helpers
+
+    /// Wrap the binary call so a missing or broken binary never fails the
+    /// Claude Code session. Pattern: existence check + run + `exit 0`.
+    /// Mirrors vibe-island's defensive hook shape.
+    static func wrappedCommand(binaryPath: String, args: String) -> String {
+        let escaped = binaryPath.replacingOccurrences(of: "'", with: "'\\''")
+        return "/bin/sh -c '[ -x \"\(escaped)\" ] && \"\(escaped)\" \(args); exit 0'"
+    }
 
     private static func isVibelightEntry(_ entry: [String: Any]) -> Bool {
         guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
