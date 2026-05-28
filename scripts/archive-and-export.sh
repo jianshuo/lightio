@@ -144,13 +144,22 @@ if [ "$WANT_DMG" = "1" ]; then
 fi
 
 if [ -n "$RELEASE_TAG" ]; then
-  echo "==> Publish GitHub Release $RELEASE_TAG"
-  # Auto-generated release notes pull from commits since the previous tag.
-  # The DMG attached here is what the README's "Download" link resolves to via
-  # github.com/<owner>/<repo>/releases/latest/download/CCLight.dmg
-  gh release create "$RELEASE_TAG" "$DMG" \
-    --title "CCLight $RELEASE_TAG" \
-    --generate-notes
+  # If the release already exists, re-upload the DMG with --clobber rather
+  # than failing on duplicate. Lets us re-archive the same tag (e.g. to
+  # backfill a corrected Info.plist) without having to delete/recreate the
+  # GitHub release and lose its notes.
+  if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+    echo "==> Re-uploading DMG to existing GitHub Release $RELEASE_TAG"
+    gh release upload "$RELEASE_TAG" "$DMG" --clobber
+  else
+    echo "==> Publish GitHub Release $RELEASE_TAG"
+    # Auto-generated release notes pull from commits since the previous tag.
+    # The DMG attached here is what the README's "Download" link resolves to via
+    # github.com/<owner>/<repo>/releases/latest/download/CCLight.dmg
+    gh release create "$RELEASE_TAG" "$DMG" \
+      --title "CCLight $RELEASE_TAG" \
+      --generate-notes
+  fi
   echo "==> Released:"
   gh release view "$RELEASE_TAG" --json url --jq .url
 fi
