@@ -1,0 +1,241 @@
+<!doctype html>
+<!--
+  CCLight Screenshot v2 — Multi-session
+  Halo: 4 segments (amber / green / amber / white)
+  Headline: "Four sessions. One glance."
+  Panel: none (let the notch be the hero)
+  Size: 2880×1800
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – v2 Multi-Session</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 2880px; height: 1800px; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(ellipse 50% 35% at 50% 0%, rgba(50,180,80,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 35% at 50% 0%, rgba(255,150,0,0.06) 0%, transparent 35%),
+    linear-gradient(155deg, #0a1520 0%, #091b28 40%, #060f18 100%);
+}
+.menubar {
+  position: absolute; top: 0; left: 0; right: 0; height: 54px;
+  background: rgba(20,24,32,0.88); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 36px; z-index: 100;
+}
+.menubar-left { display: flex; align-items: center; gap: 32px; flex: 1; }
+.menubar-apple { color: rgba(255,255,255,0.9); font-size: 24px; font-weight: 300; }
+.menubar-item { color: rgba(255,255,255,0.75); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+.menubar-right { display: flex; align-items: center; gap: 20px; }
+/* Combined state dot — amber because at least one session is WORKING */
+.menubar-status-icon {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+}
+.menubar-clock { color: rgba(255,255,255,0.75); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battery-icon { width: 30px; height: 14px; border: 1.5px solid rgba(255,255,255,0.55); border-radius: 3px; position: relative; padding: 2px; }
+.battery-icon::after { content: ""; position: absolute; right: -5px; top: 4px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 0 2px 2px 0; }
+.battery-fill { height: 100%; width: 80%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+.menubar-battery { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.65); font-size: 16px; font-weight: 500; }
+.notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px; background: #000;
+  border-radius: 0 0 20px 20px; z-index: 200;
+}
+/* Multi-segment notch halo */
+.notch-halo-wrap {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 644px; height: 338px; z-index: 150; pointer-events: none;
+}
+.seg {
+  position: absolute;
+  border-radius: 0 0 20px 20px;
+  width: 244px; height: 38px;
+  top: 0; left: 200px;
+  border: 2.5px solid transparent;
+  border-top: none;
+  pointer-events: none;
+}
+/* Segment 1: left arm — WORKING (amber) */
+.seg-1 {
+  border-left-color: #FFB000;
+  box-shadow:
+    -2px 0 6px  4px rgba(255,176,0,0.85),
+    -6px 0 14px 6px rgba(255,176,0,0.6),
+    -12px 0 28px 8px rgba(255,176,0,0.35),
+    -20px 0 50px 12px rgba(255,176,0,0.15);
+  clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+  animation: breathe-amber 1.8s ease-in-out infinite;
+}
+@keyframes breathe-amber {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1.0; }
+}
+/* Segment 2: bottom-left — WAITING (green) */
+.seg-2 {
+  border-bottom-color: #5fcf7a;
+  border-left-color: #5fcf7a;
+  box-shadow:
+    0 4px 6px  4px rgba(95,207,122,0.85),
+    0 8px 14px 6px rgba(95,207,122,0.6),
+    0 16px 28px 8px rgba(95,207,122,0.35);
+  clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%);
+}
+/* Segment 3: bottom-right — WORKING (amber) */
+.seg-3 {
+  border-bottom-color: #FFB000;
+  border-right-color: #FFB000;
+  box-shadow:
+    0 4px 6px  4px rgba(255,176,0,0.85),
+    0 8px 14px 6px rgba(255,176,0,0.6),
+    0 16px 28px 8px rgba(255,176,0,0.35),
+    8px 0 14px 6px rgba(255,176,0,0.5);
+  clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%);
+  animation: breathe-amber 1.8s ease-in-out 0.6s infinite;
+}
+/* Segment 4: right arm — IDLE (white) */
+.seg-4 {
+  border-right-color: rgba(255,255,255,0.8);
+  box-shadow:
+    4px 0 6px  4px rgba(255,255,255,0.5),
+    8px 0 14px 6px rgba(255,255,255,0.3),
+    16px 0 28px 8px rgba(255,255,255,0.15);
+  clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+  opacity: 0.7;
+}
+.desktop { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.app-badge {
+  position: absolute; top: 80px; left: 100px;
+  display: flex; align-items: center; gap: 20px; z-index: 50;
+}
+.app-badge-icon {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: linear-gradient(135deg, #1a2030 0%, #0d141e 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.app-badge-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 10px #FFB000;
+}
+.app-badge-name { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.95); letter-spacing: -0.02em; }
+.app-badge-tagline { font-size: 20px; color: rgba(255,255,255,0.4); letter-spacing: -0.01em; }
+.app-badge-text { display: flex; flex-direction: column; gap: 4px; }
+
+/* Session legend */
+.session-legend {
+  position: absolute; top: 80px; right: 100px;
+  display: flex; flex-direction: column; gap: 18px;
+  z-index: 50;
+}
+.session-item {
+  display: flex; align-items: center; gap: 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px 24px;
+  width: 380px;
+}
+.session-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.session-name { flex: 1; color: rgba(255,255,255,0.8); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.session-state { font-size: 15px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.headline-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 38%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 100px; z-index: 50;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+}
+.headline {
+  font-size: 88px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+  text-align: center; max-width: 2200px; padding: 0 100px; color: #fff;
+}
+.subhead {
+  margin-top: 32px; font-size: 44px; font-weight: 400;
+  color: rgba(255,255,255,0.45); letter-spacing: -0.015em; text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Finder</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+    <span class="menubar-item">Window</span>
+  </div>
+  <div class="menubar-right">
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>72%</span>
+    </div>
+    <span class="menubar-clock">11:17</span>
+  </div>
+</div>
+
+<div class="notch"></div>
+<div class="notch-halo-wrap">
+  <div class="seg seg-1"></div>
+  <div class="seg seg-2"></div>
+  <div class="seg seg-3"></div>
+  <div class="seg seg-4"></div>
+</div>
+
+<div class="desktop">
+  <div class="app-badge">
+    <div class="app-badge-icon"><div class="app-badge-dot"></div></div>
+    <div class="app-badge-text">
+      <span class="app-badge-name">CCLight</span>
+      <span class="app-badge-tagline">Multi-session status</span>
+    </div>
+  </div>
+
+  <!-- Session legend -->
+  <div class="session-legend">
+    <div class="session-item">
+      <div class="session-dot" style="background:#FFB000; box-shadow: 0 0 8px rgba(255,176,0,0.9);"></div>
+      <span class="session-name">~/project-alpha</span>
+      <span class="session-state" style="color:#FFD466;">Working</span>
+    </div>
+    <div class="session-item">
+      <div class="session-dot" style="background:#5fcf7a; box-shadow: 0 0 8px rgba(95,207,122,0.9);"></div>
+      <span class="session-name">~/api-refactor</span>
+      <span class="session-state" style="color:#5fcf7a;">Waiting</span>
+    </div>
+    <div class="session-item">
+      <div class="session-dot" style="background:#FFB000; box-shadow: 0 0 8px rgba(255,176,0,0.9);"></div>
+      <span class="session-name">~/docs-update</span>
+      <span class="session-state" style="color:#FFD466;">Working</span>
+    </div>
+    <div class="session-item">
+      <div class="session-dot" style="background:rgba(255,255,255,0.7); box-shadow: 0 0 8px rgba(255,255,255,0.4);"></div>
+      <span class="session-name">~/vibelight</span>
+      <span class="session-state" style="color:rgba(255,255,255,0.45);">Idle</span>
+    </div>
+  </div>
+
+  <div class="headline-area">
+    <div class="headline">Four sessions. One glance.</div>
+    <div class="subhead">Each segment of the notch outline maps to one active Claude Code session.</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,746 @@
+<!doctype html>
+<!--
+  CCLight – Marketing Screenshot Template
+  ========================================
+  Renders a 2880×1800 marketing screenshot for App Store submission.
+  All visual parameters are configurable via query string or data attributes.
+
+  QUERY STRING PARAMETERS
+  -----------------------
+  color       Halo color key: amber | green | white | multi
+              Default: amber
+  headline    URL-encoded headline text
+              Default: "Your notch tells you when Claude is thinking."
+  subhead     URL-encoded sub-headline text (optional)
+  panel       Side panel variant: terminal | menu | settings | none
+              Default: none
+  bg          Background gradient key: slate | dark | purple
+              Default: slate
+
+  USAGE EXAMPLE
+  -------------
+  file:///.../mockup-template.html?color=green&headline=Green+%3D+your+turn.&panel=terminal
+
+  For programmatic rendering (headless Chrome), pass the parameters on the
+  command line – see screenshots/README.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – Screenshot Template</title>
+<style>
+/* ============================================================
+   RESET & BASE
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 2880px;
+  height: 1800px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+               "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   BACKGROUND VARIANTS  (set via data-bg on <body>)
+============================================================ */
+body[data-bg="slate"],
+body {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(30,50,80,0.8) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 20% 100%, rgba(10,30,50,0.6) 0%, transparent 60%),
+    linear-gradient(155deg, #0d1520 0%, #0a1e2e 40%, #071118 100%);
+}
+body[data-bg="dark"] {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(20,20,40,0.9) 0%, transparent 70%),
+    linear-gradient(155deg, #08080f 0%, #0d0d1a 50%, #050508 100%);
+}
+body[data-bg="purple"] {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(50,20,80,0.7) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 60% at 80% 100%, rgba(20,10,50,0.5) 0%, transparent 60%),
+    linear-gradient(155deg, #100a1e 0%, #0e0a1c 40%, #07050f 100%);
+}
+
+/* ============================================================
+   MENU BAR
+============================================================ */
+.menubar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 54px;
+  background: rgba(20,24,32,0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 36px;
+  z-index: 100;
+}
+
+.menubar-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex: 1;
+}
+.menubar-apple {
+  color: rgba(255,255,255,0.9);
+  font-size: 24px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+.menubar-item {
+  color: rgba(255,255,255,0.75);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+
+.menubar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.menubar-status-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.menubar-clock {
+  color: rgba(255,255,255,0.75);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.menubar-wifi {
+  width: 24px; height: 18px;
+  opacity: 0.7;
+}
+.menubar-battery {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255,255,255,0.65);
+  font-size: 16px;
+  font-weight: 500;
+}
+.battery-icon {
+  width: 30px; height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  border-radius: 3px;
+  position: relative;
+  padding: 2px;
+}
+.battery-icon::after {
+  content: "";
+  position: absolute;
+  right: -5px; top: 4px;
+  width: 3px; height: 6px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 0 2px 2px 0;
+}
+.battery-fill {
+  height: 100%;
+  width: 80%;
+  background: rgba(255,255,255,0.8);
+  border-radius: 1px;
+}
+
+/* ============================================================
+   NOTCH
+============================================================ */
+.notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 244px;      /* matches ~M2 notch proportions at 2x density */
+  height: 38px;
+  background: #000;
+  border-radius: 0 0 20px 20px;
+  z-index: 200;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ============================================================
+   NOTCH HALO — U-SHAPE OUTLINE
+   The "real" CCLight draws a U-path in CAShapeLayer; here we
+   approximate it with a pseudo-element that covers only the
+   bottom 3 sides of the notch bounding rect.
+============================================================ */
+.notch-halo-wrap {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  /* extra bleed for the glow to spill outside the notch bounds */
+  width: calc(244px + 200px);
+  height: calc(38px + 200px);
+  z-index: 150;
+  pointer-events: none;
+}
+
+/* The U-shape uses clip-path to expose only left edge, bottom, right edge */
+.notch-halo-line {
+  position: absolute;
+  /* inset so it sits at the notch edge */
+  top: 0;
+  left: 100px;   /* = half of the extra bleed (200/2) */
+  width: 244px;
+  height: 38px;
+  border-radius: 0 0 20px 20px;
+  border-top: none;
+}
+
+/* ============================================================
+   HALO COLOR DEFINITIONS
+============================================================ */
+
+/* --- AMBER (WORKING) --- */
+body[data-color="amber"] .notch-halo-line,
+body .notch-halo-line {
+  box-shadow:
+    0 0 0 2px #FFB000,
+    0 0 6px  4px rgba(255,176,0,0.9),
+    0 0 14px 6px rgba(255,176,0,0.7),
+    0 0 28px 10px rgba(255,176,0,0.4),
+    0 0 50px 16px rgba(255,176,0,0.2),
+    0 0 80px 24px rgba(255,176,0,0.1);
+  border: 2px solid #FFB000;
+  /* hide the top border to make a U-shape */
+  border-top-color: transparent;
+}
+body[data-color="amber"] .menubar-status-icon,
+body .menubar-status-icon {
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+}
+
+/* --- GREEN (WAITING) --- */
+body[data-color="green"] .notch-halo-line {
+  box-shadow:
+    0 0 0 2px #5fcf7a,
+    0 0 6px  4px rgba(95,207,122,0.9),
+    0 0 14px 6px rgba(95,207,122,0.7),
+    0 0 28px 10px rgba(95,207,122,0.4),
+    0 0 50px 16px rgba(95,207,122,0.2),
+    0 0 80px 24px rgba(95,207,122,0.1);
+  border: 2px solid #5fcf7a;
+  border-top-color: transparent;
+}
+body[data-color="green"] .menubar-status-icon {
+  background: #5fcf7a;
+  box-shadow: 0 0 8px rgba(95,207,122,0.9), 0 0 16px rgba(95,207,122,0.5);
+}
+
+/* --- WHITE (IDLE) --- */
+body[data-color="white"] .notch-halo-line {
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.9),
+    0 0 6px  4px rgba(255,255,255,0.6),
+    0 0 14px 6px rgba(255,255,255,0.4),
+    0 0 28px 10px rgba(255,255,255,0.2),
+    0 0 50px 16px rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.85);
+  border-top-color: transparent;
+}
+body[data-color="white"] .menubar-status-icon {
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 0 8px rgba(255,255,255,0.7), 0 0 16px rgba(255,255,255,0.3);
+}
+
+/* --- MULTI (MULTI-SESSION) --- */
+/* Rendered via individual segment divs — see .segment-* classes below */
+body[data-color="multi"] .notch-halo-line {
+  border: none;
+  box-shadow: none;
+}
+body[data-color="multi"] .menubar-status-icon {
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+}
+
+/* Multi-segment: 4 divs, each covering a portion of the U
+   Left side, bottom-left, bottom, bottom-right, right side =
+   we approximate with clip-path on colored overlays */
+.multi-segments {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+}
+
+/* The U path has: left arm (25%), bottom-left corner (12.5%),
+   bottom bar (25%), bottom-right corner (12.5%), right arm (25%)
+   Total = 100%. Four segments each get 25% of the full path length.
+   Segment 1: left arm (approx: left border)
+   Segment 2: bottom-left + bottom-left half
+   Segment 3: bottom-right half
+   Segment 4: right arm (approx: right border)
+*/
+
+/* We approximate with four box-shadow divs clipped to quadrants */
+.seg {
+  position: absolute;
+  border-radius: 0 0 20px 20px;
+  width: 244px;
+  height: 38px;
+  top: 0;
+  left: 100px;
+  border: 2px solid transparent;
+  border-top: none;
+  pointer-events: none;
+}
+.seg-1 {
+  border-left-color: #FFB000;
+  box-shadow:
+    -2px 0 6px  4px rgba(255,176,0,0.8),
+    -4px 0 14px 6px rgba(255,176,0,0.5),
+    -8px 0 28px 8px rgba(255,176,0,0.3);
+  clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+}
+.seg-2 {
+  border-bottom-color: #5fcf7a;
+  border-left-color: #5fcf7a;
+  box-shadow:
+    0 2px 6px  4px rgba(95,207,122,0.8),
+    0 4px 14px 6px rgba(95,207,122,0.5),
+    0 8px 28px 8px rgba(95,207,122,0.3);
+  clip-path: polygon(0 50%, 50% 50%, 50% 100%, 0 100%);
+}
+.seg-3 {
+  border-bottom-color: #FFB000;
+  border-right-color: #FFB000;
+  box-shadow:
+    0 2px 6px  4px rgba(255,176,0,0.8),
+    0 4px 14px 6px rgba(255,176,0,0.5),
+    0 8px 28px 8px rgba(255,176,0,0.3),
+    2px 0 6px  4px rgba(255,176,0,0.8);
+  clip-path: polygon(50% 50%, 100% 50%, 100% 100%, 50% 100%);
+}
+.seg-4 {
+  border-right-color: #FFFFFF;
+  box-shadow:
+    2px 0 6px  4px rgba(255,255,255,0.8),
+    4px 0 14px 6px rgba(255,255,255,0.5),
+    8px 0 28px 8px rgba(255,255,255,0.3);
+  clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%);
+}
+
+/* ============================================================
+   BREATHING ANIMATION  (active by default for amber/working)
+============================================================ */
+@keyframes breathe {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1.0; }
+}
+body[data-color="amber"] .notch-halo-line,
+body .notch-halo-line {
+  animation: breathe 1.8s ease-in-out infinite;
+}
+/* Green and white are steady (waiting/idle) */
+body[data-color="green"] .notch-halo-line,
+body[data-color="white"] .notch-halo-line {
+  animation: none;
+  opacity: 1;
+}
+
+/* ============================================================
+   DESKTOP CONTENT AREA
+============================================================ */
+.desktop {
+  position: absolute;
+  top: 54px; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+}
+
+/* Subtle screen texture/scanlines for depth */
+.desktop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.025) 3px,
+    rgba(0,0,0,0.025) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================================
+   SIDE PANEL — TERMINAL
+============================================================ */
+.panel-terminal {
+  position: absolute;
+  top: 80px;
+  right: 120px;
+  width: 820px;
+  background: rgba(12,14,20,0.92);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  box-shadow:
+    0 40px 100px rgba(0,0,0,0.7),
+    0 0 0 0.5px rgba(255,255,255,0.05) inset;
+  overflow: hidden;
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+}
+
+.terminal-titlebar {
+  height: 44px;
+  background: rgba(30,32,40,0.95);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 10px;
+}
+.terminal-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+}
+.terminal-dot.red    { background: #ff5f57; }
+.terminal-dot.yellow { background: #febc2e; }
+.terminal-dot.green  { background: #28c840; }
+.terminal-title {
+  flex: 1;
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 15px;
+  font-family: -apple-system, "SF Pro Text", sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.terminal-body {
+  padding: 24px 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.82);
+  min-height: 400px;
+}
+.term-prompt { color: #5fcf7a; }
+.term-cmd    { color: rgba(255,255,255,0.9); }
+.term-output { color: rgba(200,210,220,0.65); display: block; margin: 4px 0; }
+.term-cursor {
+  display: inline-block;
+  width: 10px; height: 18px;
+  background: #5fcf7a;
+  vertical-align: text-bottom;
+  animation: blink 1.2s step-end infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ============================================================
+   SIDE PANEL — CCLIGHT MENU
+============================================================ */
+.panel-menu {
+  position: absolute;
+  top: 60px;
+  right: 140px;
+  width: 380px;
+  background: rgba(28,30,36,0.97);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  box-shadow:
+    0 30px 80px rgba(0,0,0,0.7),
+    0 0 0 0.5px rgba(255,255,255,0.06) inset;
+  overflow: hidden;
+  font-family: -apple-system, "SF Pro Text", sans-serif;
+  font-size: 18px;
+}
+
+.menu-section {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.menu-section:last-child { border-bottom: none; }
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  color: rgba(255,255,255,0.85);
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.menu-item:hover { background: rgba(255,255,255,0.08); }
+.menu-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.menu-label { flex: 1; }
+.menu-dim {
+  color: rgba(255,255,255,0.3);
+  font-size: 15px;
+}
+.menu-header {
+  padding: 8px 18px 4px;
+  color: rgba(255,255,255,0.3);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================
+   HEADLINE OVERLAY
+============================================================ */
+.headline-area {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 38%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 100px;
+  z-index: 50;
+  /* Soft gradient vignette from bottom */
+  background: linear-gradient(
+    0deg,
+    rgba(0,0,0,0.75) 0%,
+    rgba(0,0,0,0.4) 50%,
+    transparent 100%
+  );
+}
+
+.headline {
+  font-size: 88px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-align: center;
+  max-width: 2200px;
+  padding: 0 100px;
+  /* Color will be set per variant */
+  color: #fff;
+}
+.headline .accent-amber { color: #FFD466; }
+.headline .accent-green { color: #5fcf7a; }
+.headline .accent-white { color: #fff; }
+
+.subhead {
+  margin-top: 32px;
+  font-size: 44px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: -0.015em;
+  text-align: center;
+  max-width: 2000px;
+}
+
+/* ============================================================
+   APP BADGE  (top-left branding)
+============================================================ */
+.app-badge {
+  position: absolute;
+  top: 80px;
+  left: 100px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 50;
+}
+.app-badge-icon {
+  width: 80px; height: 80px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #1a2030 0%, #0d141e 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.app-badge-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+}
+.app-badge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.app-badge-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: -0.02em;
+}
+.app-badge-tagline {
+  font-size: 20px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================
+   NOTCH CLOSE-UP INSET  (for screens that zoom in on the notch)
+============================================================ */
+.notch-inset {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 200px;
+  background: rgba(8,10,16,0.6);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.notch-inset-mock {
+  position: relative;
+  width: 244px;
+  height: 38px;
+}
+.notch-inset-notch {
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px;
+  background: #000;
+  border-radius: 0 0 20px 20px;
+}
+.notch-inset-halo {
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px;
+  border-radius: 0 0 20px 20px;
+  border: 2px solid transparent;
+  border-top: none;
+}
+
+</style>
+</head>
+<body data-color="amber" data-bg="slate" data-panel="none">
+
+<!-- ============================================================
+     MENU BAR
+============================================================ -->
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Code</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+    <span class="menubar-item">Terminal</span>
+    <span class="menubar-item">Help</span>
+  </div>
+  <div class="menubar-right">
+    <!-- CCLight status dot -->
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>87%</span>
+    </div>
+    <span class="menubar-clock">10:42</span>
+  </div>
+</div>
+
+<!-- ============================================================
+     NOTCH + HALO
+============================================================ -->
+<div class="notch"></div>
+<div class="notch-halo-wrap" id="halo-wrap">
+  <!-- Single-session halo -->
+  <div class="notch-halo-line" id="halo-line"></div>
+  <!-- Multi-session segments (shown only when data-color="multi") -->
+  <div class="multi-segments" id="multi-segments" style="display:none;">
+    <div class="seg seg-1"></div>
+    <div class="seg seg-2"></div>
+    <div class="seg seg-3"></div>
+    <div class="seg seg-4"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     DESKTOP
+============================================================ -->
+<div class="desktop" id="desktop">
+
+  <!-- App badge top-left -->
+  <div class="app-badge">
+    <div class="app-badge-icon">
+      <div class="app-badge-dot" id="badge-dot"></div>
+    </div>
+    <div class="app-badge-text">
+      <span class="app-badge-name">CCLight</span>
+      <span class="app-badge-tagline">Ambient status for Claude Code</span>
+    </div>
+  </div>
+
+  <!-- Side panel (injected by each variant via JS or pre-filled) -->
+  <div id="side-panel"></div>
+
+  <!-- Headline area -->
+  <div class="headline-area">
+    <div class="headline" id="headline-text">Your notch tells you when Claude is thinking.</div>
+    <div class="subhead" id="subhead-text"></div>
+  </div>
+
+</div><!-- /desktop -->
+
+<!-- ============================================================
+     QUERY STRING → DATA ATTRIBUTES  (runtime config)
+============================================================ -->
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+
+  // color
+  var color = params.get('color') || 'amber';
+  document.body.setAttribute('data-color', color);
+
+  // badge dot color
+  var dotColors = {
+    amber: '#FFB000',
+    green: '#5fcf7a',
+    white: 'rgba(255,255,255,0.85)',
+    multi: '#FFB000'
+  };
+  var badgeDot = document.getElementById('badge-dot');
+  if (badgeDot) {
+    badgeDot.style.background = dotColors[color] || dotColors.amber;
+    badgeDot.style.boxShadow = '0 0 10px ' + (dotColors[color] || dotColors.amber);
+  }
+
+  // headline / subhead
+  var hl = params.get('headline');
+  if (hl) document.getElementById('headline-text').textContent = hl;
+  var sh = params.get('subhead');
+  if (sh) document.getElementById('subhead-text').textContent = sh;
+
+  // background
+  var bg = params.get('bg') || 'slate';
+  document.body.setAttribute('data-bg', bg);
+
+  // multi-session toggle
+  if (color === 'multi') {
+    document.getElementById('halo-line').style.display = 'none';
+    document.getElementById('multi-segments').style.display = 'block';
+  }
+
+  // panel (terminal/menu — each variant HTML sets this up inline;
+  // this script just sets the data attr for potential CSS use)
+  var panel = params.get('panel') || 'none';
+  document.body.setAttribute('data-panel', panel);
+})();
+</script>
+
+</body>
+</html>

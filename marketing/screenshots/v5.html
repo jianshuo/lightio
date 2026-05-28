@@ -1,0 +1,270 @@
+<!doctype html>
+<!--
+  CCLight Screenshot v5 — Menu dropdown
+  Halo: Amber (combined state: working)
+  Headline: "Drill in when you need to. Otherwise, never."
+  Panel: CCLight menu dropdown open
+  Size: 2880×1800
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – v5 Menu</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 2880px; height: 1800px; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(30,50,80,0.8) 0%, transparent 60%),
+    linear-gradient(155deg, #0d1520 0%, #0a1e2e 40%, #071118 100%);
+}
+.menubar {
+  position: absolute; top: 0; left: 0; right: 0; height: 54px;
+  background: rgba(20,24,32,0.88); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 36px; z-index: 100;
+}
+.menubar-left { display: flex; align-items: center; gap: 32px; flex: 1; }
+.menubar-apple { color: rgba(255,255,255,0.9); font-size: 24px; font-weight: 300; }
+.menubar-item { color: rgba(255,255,255,0.75); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+.menubar-right { display: flex; align-items: center; gap: 20px; }
+.menubar-status-icon {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+  /* selected state */
+  outline: 2px solid rgba(255,176,0,0.3); outline-offset: 3px;
+}
+.menubar-clock { color: rgba(255,255,255,0.75); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battery-icon { width: 30px; height: 14px; border: 1.5px solid rgba(255,255,255,0.55); border-radius: 3px; position: relative; padding: 2px; }
+.battery-icon::after { content: ""; position: absolute; right: -5px; top: 4px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 0 2px 2px 0; }
+.battery-fill { height: 100%; width: 80%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+.menubar-battery { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.65); font-size: 16px; font-weight: 500; }
+.notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px; background: #000;
+  border-radius: 0 0 20px 20px; z-index: 200;
+}
+.notch-halo-wrap {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 444px; height: 238px; z-index: 150; pointer-events: none;
+}
+.notch-halo-line {
+  position: absolute; top: 0; left: 100px;
+  width: 244px; height: 38px;
+  border-radius: 0 0 20px 20px;
+  border: 2px solid #FFB000; border-top-color: transparent;
+  box-shadow:
+    0 0 0 2px #FFB000,
+    0 0 6px  4px rgba(255,176,0,0.9),
+    0 0 14px 6px rgba(255,176,0,0.7),
+    0 0 28px 10px rgba(255,176,0,0.4),
+    0 0 50px 16px rgba(255,176,0,0.2),
+    0 0 80px 24px rgba(255,176,0,0.1);
+  animation: breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1.0; } }
+.desktop { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+
+/* CCLight dropdown menu — positioned near top-right to simulate clicking the dot */
+.cclight-menu {
+  position: absolute;
+  top: 60px;
+  right: 80px;
+  width: 440px;
+  background: rgba(26,28,36,0.98);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  box-shadow:
+    0 4px 6px rgba(0,0,0,0.15),
+    0 20px 60px rgba(0,0,0,0.65),
+    0 0 0 0.5px rgba(255,255,255,0.06) inset;
+  overflow: hidden;
+  font-family: -apple-system, "SF Pro Text", sans-serif;
+  z-index: 300;
+}
+.menu-header-section {
+  padding: 14px 18px 10px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.menu-header-title {
+  font-size: 13px; font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+.menu-session-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 9px 4px;
+}
+.menu-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.menu-session-name { flex: 1; color: rgba(255,255,255,0.82); font-size: 16px; letter-spacing: -0.01em; }
+.menu-session-state { font-size: 13px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.menu-section {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.menu-section:last-child { border-bottom: none; }
+.menu-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px;
+  color: rgba(255,255,255,0.78);
+  font-size: 16px; letter-spacing: -0.01em;
+  cursor: default;
+}
+.menu-item.highlighted { background: rgba(255,176,0,0.12); color: rgba(255,255,255,0.95); }
+.menu-item .menu-item-key {
+  margin-left: auto;
+  color: rgba(255,255,255,0.28);
+  font-size: 13px;
+}
+.menu-submenu-arrow { margin-left: auto; color: rgba(255,255,255,0.3); font-size: 13px; }
+.menu-item-dim { color: rgba(255,255,255,0.35); }
+.menu-version {
+  padding: 8px 18px 12px;
+  color: rgba(255,255,255,0.2);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+/* Dropdown arrow connecting to menu bar dot */
+.menu-arrow {
+  position: absolute;
+  top: -8px; right: 52px;
+  width: 0; height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid rgba(26,28,36,0.98);
+}
+
+.headline-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 38%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 100px; z-index: 50;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+}
+.headline {
+  font-size: 88px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+  text-align: center; max-width: 2200px; padding: 0 100px; color: #fff;
+}
+.subhead {
+  margin-top: 32px; font-size: 44px; font-weight: 400;
+  color: rgba(255,255,255,0.45); letter-spacing: -0.015em; text-align: center;
+}
+.app-badge {
+  position: absolute; top: 80px; left: 100px;
+  display: flex; align-items: center; gap: 20px; z-index: 50;
+}
+.app-badge-icon {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: linear-gradient(135deg, #1a2030 0%, #0d141e 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.app-badge-dot { width: 28px; height: 28px; border-radius: 50%; background: #FFB000; box-shadow: 0 0 10px #FFB000; }
+.app-badge-name { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.95); letter-spacing: -0.02em; }
+.app-badge-tagline { font-size: 20px; color: rgba(255,255,255,0.4); letter-spacing: -0.01em; }
+.app-badge-text { display: flex; flex-direction: column; gap: 4px; }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Finder</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+    <span class="menubar-item">Window</span>
+  </div>
+  <div class="menubar-right">
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>82%</span>
+    </div>
+    <span class="menubar-clock">10:42</span>
+  </div>
+</div>
+
+<div class="notch"></div>
+<div class="notch-halo-wrap">
+  <div class="notch-halo-line"></div>
+</div>
+
+<div class="desktop">
+  <div class="app-badge">
+    <div class="app-badge-icon"><div class="app-badge-dot"></div></div>
+    <div class="app-badge-text">
+      <span class="app-badge-name">CCLight</span>
+      <span class="app-badge-tagline">Ambient status for Claude Code</span>
+    </div>
+  </div>
+
+  <!-- CCLight menu dropdown -->
+  <div class="cclight-menu">
+    <div class="menu-arrow"></div>
+
+    <!-- Sessions section -->
+    <div class="menu-header-section">
+      <div class="menu-header-title">Sessions</div>
+      <div class="menu-session-row">
+        <div class="menu-dot" style="background:#FFB000; box-shadow: 0 0 6px rgba(255,176,0,0.8);"></div>
+        <span class="menu-session-name">~/project-alpha</span>
+        <span class="menu-session-state" style="color:#FFD466;">Working</span>
+      </div>
+      <div class="menu-session-row">
+        <div class="menu-dot" style="background:#5fcf7a; box-shadow: 0 0 6px rgba(95,207,122,0.8);"></div>
+        <span class="menu-session-name">~/api-refactor</span>
+        <span class="menu-session-state" style="color:#5fcf7a;">Waiting</span>
+      </div>
+      <div class="menu-session-row">
+        <div class="menu-dot" style="background:rgba(255,255,255,0.6);"></div>
+        <span class="menu-session-name">~/vibelight</span>
+        <span class="menu-session-state" style="color:rgba(255,255,255,0.35);">Idle</span>
+      </div>
+    </div>
+
+    <!-- Hooks -->
+    <div class="menu-section">
+      <div class="menu-item">
+        <span>Hooks</span>
+        <span class="menu-submenu-arrow">▸</span>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="menu-section">
+      <div class="menu-item highlighted">
+        <span>Launch at Login</span>
+        <span class="menu-item-key">✓</span>
+      </div>
+    </div>
+
+    <!-- About / Quit -->
+    <div class="menu-section">
+      <div class="menu-item"><span>About CCLight</span></div>
+      <div class="menu-item"><span>Quit CCLight</span><span class="menu-item-key">⌘Q</span></div>
+    </div>
+
+    <div class="menu-version">CCLight 1.0 · com.wangjianshuo.lightio</div>
+  </div>
+
+  <div class="headline-area">
+    <div class="headline">Drill in when you need to. Otherwise, never.</div>
+    <div class="subhead">A single click shows every session by name, state, and directory.</div>
+  </div>
+</div>
+
+</body>
+</html>

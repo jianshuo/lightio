@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+  CCLight Screenshot v1 — Hero / WORKING state
+  Halo: Amber   State: Claude is working
+  Headline: "Your notch tells you when Claude is thinking."
+  Panel: none (clean hero)
+  Size: 2880×1800
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – v1 Hero</title>
+<style>
+/* Load base template styles inline */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 2880px; height: 1800px; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 0%, rgba(255,150,0,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 20% 100%, rgba(10,30,50,0.7) 0%, transparent 60%),
+    linear-gradient(155deg, #0d1520 0%, #0a1e2e 40%, #071118 100%);
+}
+.menubar {
+  position: absolute; top: 0; left: 0; right: 0; height: 54px;
+  background: rgba(20,24,32,0.88); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 36px; z-index: 100;
+}
+.menubar-left { display: flex; align-items: center; gap: 32px; flex: 1; }
+.menubar-apple { color: rgba(255,255,255,0.9); font-size: 24px; font-weight: 300; }
+.menubar-item { color: rgba(255,255,255,0.75); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+.menubar-right { display: flex; align-items: center; gap: 20px; }
+.menubar-status-icon {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+}
+.menubar-clock { color: rgba(255,255,255,0.75); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battery-icon { width: 30px; height: 14px; border: 1.5px solid rgba(255,255,255,0.55); border-radius: 3px; position: relative; padding: 2px; }
+.battery-icon::after { content: ""; position: absolute; right: -5px; top: 4px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 0 2px 2px 0; }
+.battery-fill { height: 100%; width: 80%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+.menubar-battery { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.65); font-size: 16px; font-weight: 500; }
+.notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px; background: #000;
+  border-radius: 0 0 20px 20px; z-index: 200;
+}
+.notch-halo-wrap {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 444px; height: 238px; z-index: 150; pointer-events: none;
+}
+.notch-halo-line {
+  position: absolute; top: 0; left: 100px;
+  width: 244px; height: 38px;
+  border-radius: 0 0 20px 20px;
+  border: 2px solid #FFB000; border-top-color: transparent;
+  box-shadow:
+    0 0 0 2px #FFB000,
+    0 0 6px  4px rgba(255,176,0,0.9),
+    0 0 14px 6px rgba(255,176,0,0.7),
+    0 0 28px 10px rgba(255,176,0,0.4),
+    0 0 50px 16px rgba(255,176,0,0.2),
+    0 0 80px 24px rgba(255,176,0,0.1);
+  animation: breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 1.0; }
+}
+.desktop { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.app-badge {
+  position: absolute; top: 80px; left: 100px;
+  display: flex; align-items: center; gap: 20px; z-index: 50;
+}
+.app-badge-icon {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: linear-gradient(135deg, #1a2030 0%, #0d141e 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.app-badge-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 10px #FFB000, 0 0 20px rgba(255,176,0,0.6);
+}
+.app-badge-name { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.95); letter-spacing: -0.02em; }
+.app-badge-tagline { font-size: 20px; color: rgba(255,255,255,0.4); letter-spacing: -0.01em; }
+.app-badge-text { display: flex; flex-direction: column; gap: 4px; }
+.notch-callout {
+  position: absolute;
+  top: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.notch-callout-label {
+  font-size: 22px;
+  font-weight: 600;
+  color: rgba(255,176,0,0.7);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.notch-callout-arrow {
+  margin-top: 10px;
+  font-size: 20px;
+  color: rgba(255,176,0,0.5);
+}
+.headline-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 38%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 100px; z-index: 50;
+  background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+}
+.headline {
+  font-size: 88px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+  text-align: center; max-width: 2200px; padding: 0 100px; color: #fff;
+}
+.headline .accent { color: #FFD466; }
+.subhead {
+  margin-top: 32px; font-size: 44px; font-weight: 400;
+  color: rgba(255,255,255,0.45); letter-spacing: -0.015em; text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Code</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Terminal</span>
+    <span class="menubar-item">Help</span>
+  </div>
+  <div class="menubar-right">
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>87%</span>
+    </div>
+    <span class="menubar-clock">10:42</span>
+  </div>
+</div>
+
+<div class="notch"></div>
+<div class="notch-halo-wrap">
+  <div class="notch-halo-line"></div>
+</div>
+
+<div class="desktop">
+  <div class="app-badge">
+    <div class="app-badge-icon"><div class="app-badge-dot"></div></div>
+    <div class="app-badge-text">
+      <span class="app-badge-name">CCLight</span>
+      <span class="app-badge-tagline">Ambient status for Claude Code</span>
+    </div>
+  </div>
+
+  <!-- Subtle callout pointing at the notch -->
+  <div class="notch-callout">
+    <div class="notch-callout-label">WORKING — amber</div>
+  </div>
+
+  <div class="headline-area">
+    <div class="headline">Your notch tells you when<br><span class="accent">Claude is thinking.</span></div>
+    <div class="subhead">No windows. No notifications. Just light.</div>
+  </div>
+</div>
+
+</body>
+</html>

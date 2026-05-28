@@ -1,0 +1,223 @@
+<!doctype html>
+<!--
+  CCLight Screenshot v6 — Privacy / Local-first
+  Halo: White (IDLE)
+  Headline: "No network. No telemetry. Just light."
+  Panel: privacy facts list
+  Size: 2880×1800
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – v6 Privacy</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 2880px; height: 1800px; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(180,200,230,0.04) 0%, transparent 55%),
+    linear-gradient(155deg, #0c1018 0%, #0a141e 40%, #070a10 100%);
+}
+.menubar {
+  position: absolute; top: 0; left: 0; right: 0; height: 54px;
+  background: rgba(18,22,30,0.88); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 36px; z-index: 100;
+}
+.menubar-left { display: flex; align-items: center; gap: 32px; flex: 1; }
+.menubar-apple { color: rgba(255,255,255,0.9); font-size: 24px; font-weight: 300; }
+.menubar-item { color: rgba(255,255,255,0.75); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+.menubar-right { display: flex; align-items: center; gap: 20px; }
+/* White idle dot */
+.menubar-status-icon {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,255,255,0.75);
+  box-shadow: 0 0 6px rgba(255,255,255,0.5);
+}
+.menubar-clock { color: rgba(255,255,255,0.75); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battery-icon { width: 30px; height: 14px; border: 1.5px solid rgba(255,255,255,0.55); border-radius: 3px; position: relative; padding: 2px; }
+.battery-icon::after { content: ""; position: absolute; right: -5px; top: 4px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 0 2px 2px 0; }
+.battery-fill { height: 100%; width: 55%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+.menubar-battery { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.65); font-size: 16px; font-weight: 500; }
+.notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px; background: #000;
+  border-radius: 0 0 20px 20px; z-index: 200;
+}
+.notch-halo-wrap {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 444px; height: 238px; z-index: 150; pointer-events: none;
+}
+.notch-halo-line {
+  position: absolute; top: 0; left: 100px;
+  width: 244px; height: 38px;
+  border-radius: 0 0 20px 20px;
+  border: 2px solid rgba(255,255,255,0.85); border-top-color: transparent;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.85),
+    0 0 6px  4px rgba(255,255,255,0.6),
+    0 0 14px 6px rgba(255,255,255,0.4),
+    0 0 28px 10px rgba(255,255,255,0.2),
+    0 0 50px 16px rgba(255,255,255,0.1);
+  opacity: 0.7; /* idle is dimmer */
+}
+.desktop { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+
+.app-badge {
+  position: absolute; top: 80px; left: 100px;
+  display: flex; align-items: center; gap: 20px; z-index: 50;
+}
+.app-badge-icon {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: linear-gradient(135deg, #14181e 0%, #0d1016 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.app-badge-dot { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,0.75); box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+.app-badge-name { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.95); letter-spacing: -0.02em; }
+.app-badge-tagline { font-size: 20px; color: rgba(255,255,255,0.4); letter-spacing: -0.01em; }
+.app-badge-text { display: flex; flex-direction: column; gap: 4px; }
+
+/* Privacy fact cards */
+.privacy-grid {
+  position: absolute;
+  top: 200px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  width: 1600px;
+  z-index: 50;
+}
+.privacy-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 44px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.privacy-icon {
+  font-size: 40px;
+  line-height: 1;
+}
+.privacy-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: -0.02em;
+}
+.privacy-desc {
+  font-size: 22px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+.check {
+  display: inline-block;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(95,207,122,0.15);
+  border: 1.5px solid rgba(95,207,122,0.4);
+  color: #5fcf7a;
+  font-size: 14px;
+  text-align: center;
+  line-height: 24px;
+  flex-shrink: 0;
+}
+
+.headline-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 30%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 100px; z-index: 50;
+  background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 55%, transparent 100%);
+}
+.headline {
+  font-size: 88px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+  text-align: center; max-width: 2200px; padding: 0 100px; color: #fff;
+}
+.subhead {
+  margin-top: 32px; font-size: 44px; font-weight: 400;
+  color: rgba(255,255,255,0.45); letter-spacing: -0.015em; text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Finder</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+    <span class="menubar-item">Window</span>
+  </div>
+  <div class="menubar-right">
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>55%</span>
+    </div>
+    <span class="menubar-clock">09:15</span>
+  </div>
+</div>
+
+<div class="notch"></div>
+<div class="notch-halo-wrap">
+  <div class="notch-halo-line"></div>
+</div>
+
+<div class="desktop">
+  <div class="app-badge">
+    <div class="app-badge-icon"><div class="app-badge-dot"></div></div>
+    <div class="app-badge-text">
+      <span class="app-badge-name">CCLight</span>
+      <span class="app-badge-tagline">Ambient status for Claude Code</span>
+    </div>
+  </div>
+
+  <!-- Privacy fact grid -->
+  <div class="privacy-grid">
+    <div class="privacy-card">
+      <div class="privacy-icon">🔌</div>
+      <div class="privacy-title">No network access</div>
+      <div class="privacy-desc">CCLight never opens a socket. There is no server, no API call, no ping home.</div>
+    </div>
+    <div class="privacy-card">
+      <div class="privacy-icon">📊</div>
+      <div class="privacy-title">No analytics or telemetry</div>
+      <div class="privacy-desc">No crash reporters, no usage tracking, no third-party SDKs of any kind.</div>
+    </div>
+    <div class="privacy-card">
+      <div class="privacy-icon">📦</div>
+      <div class="privacy-title">Data stays on your Mac</div>
+      <div class="privacy-desc">Session state is a local JSON file in the app's sandbox container — never synced, never shared.</div>
+    </div>
+    <div class="privacy-card">
+      <div class="privacy-icon">🔒</div>
+      <div class="privacy-title">Sandboxed</div>
+      <div class="privacy-desc">App Store sandbox enforced. Hooks file access requires your explicit permission via a system dialog.</div>
+    </div>
+  </div>
+
+  <div class="headline-area">
+    <div class="headline">No network. No telemetry. Just light.</div>
+    <div class="subhead">CCLight is open source. What you see is all there is.</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!doctype html>
+<!--
+  CCLight Screenshot v4 — Ambient / Peripheral vision
+  Halo: Amber (Claude working in background)
+  Headline: "Designed to live in your peripheral vision."
+  Panel: editor with code in foreground, notch glowing at top
+  Size: 2880×1800
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=2880" />
+<title>CCLight – v4 Ambient</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 2880px; height: 1800px; overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background: linear-gradient(155deg, #0d1520 0%, #0a1e2e 40%, #071118 100%);
+}
+.menubar {
+  position: absolute; top: 0; left: 0; right: 0; height: 54px;
+  background: rgba(20,24,32,0.88); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 36px; z-index: 100;
+}
+.menubar-left { display: flex; align-items: center; gap: 32px; flex: 1; }
+.menubar-apple { color: rgba(255,255,255,0.9); font-size: 24px; font-weight: 300; }
+.menubar-item { color: rgba(255,255,255,0.75); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.menubar-item.bold { font-weight: 700; color: rgba(255,255,255,0.95); }
+.menubar-right { display: flex; align-items: center; gap: 20px; }
+.menubar-status-icon {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #FFB000;
+  box-shadow: 0 0 8px rgba(255,176,0,0.9), 0 0 16px rgba(255,176,0,0.5);
+}
+.menubar-clock { color: rgba(255,255,255,0.75); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.battery-icon { width: 30px; height: 14px; border: 1.5px solid rgba(255,255,255,0.55); border-radius: 3px; position: relative; padding: 2px; }
+.battery-icon::after { content: ""; position: absolute; right: -5px; top: 4px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 0 2px 2px 0; }
+.battery-fill { height: 100%; width: 90%; background: rgba(255,255,255,0.8); border-radius: 1px; }
+.menubar-battery { display: flex; align-items: center; gap: 5px; color: rgba(255,255,255,0.65); font-size: 16px; font-weight: 500; }
+.notch {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 244px; height: 38px; background: #000;
+  border-radius: 0 0 20px 20px; z-index: 200;
+}
+.notch-halo-wrap {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 444px; height: 238px; z-index: 150; pointer-events: none;
+}
+.notch-halo-line {
+  position: absolute; top: 0; left: 100px;
+  width: 244px; height: 38px;
+  border-radius: 0 0 20px 20px;
+  border: 2px solid #FFB000; border-top-color: transparent;
+  box-shadow:
+    0 0 0 2px #FFB000,
+    0 0 6px  4px rgba(255,176,0,0.9),
+    0 0 14px 6px rgba(255,176,0,0.7),
+    0 0 28px 10px rgba(255,176,0,0.4),
+    0 0 50px 16px rgba(255,176,0,0.2),
+    0 0 80px 24px rgba(255,176,0,0.1);
+  animation: breathe 1.8s ease-in-out infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1.0; } }
+.desktop { position: absolute; top: 54px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+
+/* Fake VS Code / editor window taking up most of the screen */
+.editor-window {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #0e1117;
+  display: flex;
+}
+.editor-sidebar {
+  width: 80px; background: #1a1d24;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 24px; gap: 20px;
+}
+.sidebar-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.sidebar-icon.active { background: rgba(255,255,255,0.14); }
+.editor-file-tree {
+  width: 320px; background: #12151c;
+  border-right: 1px solid rgba(255,255,255,0.05);
+  padding: 24px 0;
+}
+.file-section-title {
+  padding: 0 20px 12px;
+  font-size: 12px; font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.file-item {
+  padding: 8px 20px;
+  font-size: 14px;
+  font-family: "SF Mono", monospace;
+  color: rgba(255,255,255,0.55);
+  display: flex; align-items: center; gap: 10px;
+}
+.file-item.active { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); }
+.file-item-icon { opacity: 0.5; font-size: 12px; }
+.editor-main { flex: 1; display: flex; flex-direction: column; }
+.editor-tabs {
+  height: 44px; background: #161920;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: flex-end; padding: 0 24px;
+  gap: 2px;
+}
+.editor-tab {
+  height: 36px; padding: 0 20px;
+  font-size: 14px; font-family: "SF Mono", monospace;
+  color: rgba(255,255,255,0.45);
+  display: flex; align-items: center;
+  border-radius: 6px 6px 0 0;
+}
+.editor-tab.active {
+  background: #0e1117;
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-bottom-color: #0e1117;
+}
+.editor-code {
+  flex: 1;
+  padding: 32px 24px;
+  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-size: 14px; line-height: 1.7;
+  color: rgba(255,255,255,0.7);
+  overflow: hidden;
+  display: flex; gap: 24px;
+}
+.line-numbers {
+  text-align: right;
+  color: rgba(255,255,255,0.18);
+  user-select: none;
+  min-width: 40px;
+}
+.code-content { flex: 1; }
+.kw  { color: #c792ea; }  /* keyword */
+.fn  { color: #82aaff; }  /* function */
+.str { color: #c3e88d; }  /* string */
+.cm  { color: rgba(255,255,255,0.28); font-style: italic; }  /* comment */
+.num { color: #f78c6c; }  /* number */
+.tp  { color: #ffcb6b; }  /* type */
+.op  { color: #89ddff; }  /* operator/punct */
+
+.headline-area {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 36%;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding-bottom: 100px; z-index: 50;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 55%, transparent 100%);
+}
+.headline {
+  font-size: 80px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05;
+  text-align: center; max-width: 2200px; padding: 0 100px; color: #fff;
+}
+.subhead {
+  margin-top: 32px; font-size: 40px; font-weight: 400;
+  color: rgba(255,255,255,0.45); letter-spacing: -0.015em; text-align: center;
+  max-width: 1800px;
+}
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="menubar-left">
+    <span class="menubar-apple">&#xF8FF;</span>
+    <span class="menubar-item bold">Code</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+    <span class="menubar-item">Terminal</span>
+  </div>
+  <div class="menubar-right">
+    <div class="menubar-status-icon"></div>
+    <div class="menubar-battery">
+      <div class="battery-icon"><div class="battery-fill"></div></div>
+      <span>91%</span>
+    </div>
+    <span class="menubar-clock">16:24</span>
+  </div>
+</div>
+
+<div class="notch"></div>
+<div class="notch-halo-wrap">
+  <div class="notch-halo-line"></div>
+</div>
+
+<div class="desktop">
+  <div class="editor-window">
+    <!-- Sidebar -->
+    <div class="editor-sidebar">
+      <div class="sidebar-icon active">⬛</div>
+      <div class="sidebar-icon">🔍</div>
+      <div class="sidebar-icon">⇌</div>
+      <div class="sidebar-icon">🐛</div>
+      <div class="sidebar-icon">⧉</div>
+    </div>
+
+    <!-- File tree -->
+    <div class="editor-file-tree">
+      <div class="file-section-title">Explorer</div>
+      <div class="file-item"><span class="file-item-icon">📁</span> src</div>
+      <div class="file-item" style="padding-left:36px;"><span class="file-item-icon">📁</span> auth</div>
+      <div class="file-item active" style="padding-left:52px;"><span class="file-item-icon">📄</span> jwt.ts</div>
+      <div class="file-item" style="padding-left:52px;"><span class="file-item-icon">📄</span> middleware.ts</div>
+      <div class="file-item" style="padding-left:52px;"><span class="file-item-icon">📄</span> refresh.ts</div>
+      <div class="file-item" style="padding-left:36px;"><span class="file-item-icon">📁</span> api</div>
+      <div class="file-item" style="padding-left:52px;"><span class="file-item-icon">📄</span> routes.ts</div>
+      <div class="file-item" style="padding-left:36px;"><span class="file-item-icon">📄</span> app.ts</div>
+      <div class="file-item"><span class="file-item-icon">📁</span> tests</div>
+      <div class="file-item"><span class="file-item-icon">📄</span> package.json</div>
+    </div>
+
+    <!-- Editor main -->
+    <div class="editor-main">
+      <div class="editor-tabs">
+        <div class="editor-tab active">jwt.ts</div>
+        <div class="editor-tab">middleware.ts</div>
+        <div class="editor-tab">refresh.ts</div>
+      </div>
+      <div class="editor-code">
+        <div class="line-numbers">
+          1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>
+          11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>
+          21<br>22<br>23<br>24<br>25<br>26<br>27<br>28<br>29<br>30
+        </div>
+        <div class="code-content">
+          <span class="cm">// JWT utilities — refactored by Claude Code</span><br>
+          <span class="kw">import</span> <op>{</op> sign, verify <span class="op">}</span> <span class="kw">from</span> <span class="str">'jsonwebtoken'</span>;<br>
+          <span class="kw">import</span> <span class="op">{</span> randomUUID <span class="op">}</span> <span class="kw">from</span> <span class="str">'node:crypto'</span>;<br>
+          <br>
+          <span class="kw">const</span> <span class="fn">SECRET</span> <span class="op">=</span> process.env.<span class="fn">JWT_SECRET</span>!;<br>
+          <span class="kw">const</span> <span class="fn">EXPIRY</span> <span class="op">=</span> <span class="str">'15m'</span>;<br>
+          <span class="kw">const</span> <span class="fn">REFRESH_EXPIRY</span> <span class="op">=</span> <span class="str">'7d'</span>;<br>
+          <br>
+          <span class="kw">export interface</span> <span class="tp">TokenPair</span> <span class="op">{</span><br>
+          &nbsp;&nbsp;accessToken<span class="op">:</span> <span class="tp">string</span>;<br>
+          &nbsp;&nbsp;refreshToken<span class="op">:</span> <span class="tp">string</span>;<br>
+          &nbsp;&nbsp;expiresIn<span class="op">:</span> <span class="tp">number</span>;<br>
+          <span class="op">}</span><br>
+          <br>
+          <span class="kw">export function</span> <span class="fn">issueTokens</span><span class="op">(</span>userId<span class="op">:</span> <span class="tp">string</span><span class="op">):</span> <span class="tp">TokenPair</span> <span class="op">{</span><br>
+          &nbsp;&nbsp;<span class="kw">const</span> jti <span class="op">=</span> <span class="fn">randomUUID</span>();<br>
+          &nbsp;&nbsp;<span class="kw">const</span> accessToken <span class="op">=</span> <span class="fn">sign</span>(<span class="op">{</span> sub<span class="op">:</span> userId, jti <span class="op">},</span> <span class="fn">SECRET</span>, <span class="op">{</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;expiresIn<span class="op">:</span> <span class="fn">EXPIRY</span>,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;algorithm<span class="op">:</span> <span class="str">'HS256'</span>,<br>
+          &nbsp;&nbsp;<span class="op">});</span><br>
+          &nbsp;&nbsp;<span class="kw">const</span> refreshToken <span class="op">=</span> <span class="fn">sign</span>(<span class="op">{</span> sub<span class="op">:</span> userId, jti, type<span class="op">:</span> <span class="str">'refresh'</span> <span class="op">},</span> <span class="fn">SECRET</span>, <span class="op">{</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;expiresIn<span class="op">:</span> <span class="fn">REFRESH_EXPIRY</span>,<br>
+          &nbsp;&nbsp;<span class="op">});</span><br>
+          &nbsp;&nbsp;<span class="kw">return</span> <span class="op">{</span> accessToken, refreshToken, expiresIn<span class="op">:</span> <span class="num">900</span> <span class="op">};</span><br>
+          <span class="op">}</span><br>
+          <br>
+          <span class="kw">export function</span> <span class="fn">verifyToken</span><span class="op">(</span>token<span class="op">:</span> <span class="tp">string</span><span class="op">):</span> <span class="tp">JWTPayload</span> <span class="op">{</span><br>
+          &nbsp;&nbsp;<span class="kw">return</span> <span class="fn">verify</span>(token, <span class="fn">SECRET</span>) <span class="kw">as</span> <span class="tp">JWTPayload</span>;<br>
+          <span class="op">}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="headline-area">
+    <div class="headline">Designed to live in your peripheral vision.</div>
+    <div class="subhead">Claude works. You work. The notch keeps score — without ever interrupting either of you.</div>
+  </div>
+</div>
+
+</body>
+</html>
