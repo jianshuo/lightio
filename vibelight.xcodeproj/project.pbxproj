@@ -132,7 +132,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/vibelight-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/vibelightcli\" \"$DEST/vibelight\"\nchmod +x \"$DEST/vibelight\"\necho \"Embedded vibelight CLI → $DEST/vibelight\"\n";
+			shellScript = "set -euo pipefail\nCLI_DIR=\"$SRCROOT/vibelight-cli\"\ncd \"$CLI_DIR\"\nswift build -c release --arch arm64 --disable-sandbox\nDEST=\"$TARGET_BUILD_DIR/$PRODUCT_NAME.app/Contents/Resources\"\nmkdir -p \"$DEST\"\ncp \".build/arm64-apple-macosx/release/vibelightcli\" \"$DEST/vibelight\"\nchmod +x \"$DEST/vibelight\"\n# Re-sign with the parent app's identity + hardened runtime so App Store\n# accepts the nested binary (swift build leaves it adhoc-signed).\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --options runtime --timestamp=none \"$DEST/vibelight\"\nfi\necho \"Embedded vibelight CLI → $DEST/vibelight\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
